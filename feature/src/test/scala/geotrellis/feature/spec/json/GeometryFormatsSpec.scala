@@ -4,18 +4,13 @@ import org.scalatest._
 
 import geotrellis.feature._
 
-import spray._
-import spray.json._
-
 import spray.httpx.unmarshalling._
 import spray.httpx.marshalling._
 import spray.http._
 import HttpCharsets._
 import MediaTypes._
 
-import spray.json.DefaultJsonProtocol
-import DefaultJsonProtocol._
-
+import SomeImplicits._
 
 class GeometryFormatsSpec extends FlatSpec with ShouldMatchers with GeoJsonSupport {
   val point = Point(6.0,1.2)
@@ -138,7 +133,8 @@ class GeometryFormatsSpec extends FlatSpec with ShouldMatchers with GeoJsonSuppo
     //TODO: What if list: List[Geometry]
     val list: Seq[Geometry] = List(point, line)
     marshal(list) should equal (Right(body))
-    body.as[Seq[Geometry]] should equal (Right(list))
+    println(body.as[List[Geometry]])
+    body.as[Vector[Geometry]] should equal (Right(list))
   }
 
 }

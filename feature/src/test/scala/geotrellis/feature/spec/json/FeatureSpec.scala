@@ -12,7 +12,9 @@ import spray.http._
 import HttpCharsets._
 import MediaTypes._
 
-class FeatureSpec extends FlatSpec with ShouldMatchers with GeoJsonSupport with GeometryFormats with FeatureFormats {
+import SomeImplicits._
+
+class FeatureSpec extends FlatSpec with ShouldMatchers with GeoJsonSupport  {
   val pointFeature = PointFeature(Point(6.0,1.2), 123)
   val lineFeature = LineFeature(Line(Point(1,2) :: Point(1,3) :: Nil), 321)
   val listOfFeatures: Seq[Feature[Geometry, Int]] = List(pointFeature, lineFeature)
@@ -78,6 +80,7 @@ class FeatureSpec extends FlatSpec with ShouldMatchers with GeoJsonSupport with 
       )
 
     marshal(listOfFeatures) should equal (Right(body))
+    println(body.as[Seq[Feature[Geometry, Int]]])
     body.as[Seq[Feature[Geometry, Int]]] should equal (Right(listOfFeatures))
   }
 }

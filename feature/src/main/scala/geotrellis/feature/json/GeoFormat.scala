@@ -2,7 +2,7 @@ package geotrellis.feature.json
 
 import spray.json._
 import geotrellis.feature._
-import scala.collection.generic.CanBuildFrom
+import DefaultJsonProtocol._
 
 /**
  * This is a container for T which is able to read/write GeoJSON for value T
@@ -17,12 +17,11 @@ trait GeoFormat[-T] extends GeoReader[T] with GeoWriter[T]
 
 
 trait SomeImplicits {
-
-  //TODO this can really just copy/paste the stuff in here
+  //TODO - this can really just copy/paste the stuff in here
   implicit object GeometryGeoFormat extends GeoFormat[Geometry] {
     override def read[J](value: JsValue): J =
       GeometryFormats.GeometryFormat.read(value).asInstanceOf[J]
-    override def write(g: Geometry): JsValue =
+    override def write(g: Geometry): JsValue = 
       GeometryFormats.GeometryFormat.write(g)
   }
 
@@ -64,23 +63,23 @@ trait SomeImplicits {
     }
   }
 
-
-  implicit def FeatureCollectionGeoFormat[G <:Geometry, D: JsonFormat] = new FeatureCollectionGeoFormat[G, D]
-  class FeatureCollectionGeoFormat[G <:Geometry, D: JsonFormat] extends GeoFormat[Seq[Feature[G,D]]]{
-    override def write(fc: Seq[Feature[G, D]]): JsValue =  JsObject(
-      "type" -> JsString("FeatureCollection"),
-      "features" -> JsArray(fc.map { f => FeatureGeoFormat.write(f) }.toList)
-    )
-
-    override def read[J <: Seq[Feature[G, D]]](value: JsValue): J =
-      value.asJsObject.getFields("features") match {
-        case Seq(JsArray(features)) =>
-        {for (feature <- features) yield
-            FeatureGeoFormat[G,D].read[Feature[G,D]](feature)
-        }.toVector.asInstanceOf[J]
-      }
-  }
+  //TODO - FeatureCollection is going to lose all type info, so this would be very tricky
+  // implicit def FeatureCollectionGeoFormat[G <:Geometry, D: JsonFormat] = new FeatureCollectionGeoFormat[G, D]
+  // class FeatureCollectionGeoFormat[G <:Geometry, D: JsonFormat] extends GeoFormat[Seq[Feature[G,D]]]{
+  //   override def write(fc: Seq[Feature[G, D]]): JsValue =  JsObject(
+  //     "type" -> JsString("FeatureCollection"),
+  //     "features" -> JsArray(fc.map { f => FeatureGeoFormat.write(f) }.toList)
+  //   )
+  // 
+  //   override def read[J <: Seq[Feature[G, D]]](value: JsValue): J =
+  //     value.asJsObject.getFields("features") match {
+  //       case Seq(JsArray(features)) =>
+  //       {for (feature <- features) yield
+  //           FeatureGeoFormat[G,D].read[Feature[G,D]](feature)
+  //       }.toVector.asInstanceOf[J]
+  //     }
+  // }
 
 
 }
-object SomeImplicits extends SomeImplicits
+object SomeImplicits extends SomeImplicits {}

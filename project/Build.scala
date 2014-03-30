@@ -111,7 +111,7 @@ object GeotrellisBuild extends Build {
   // Project: root
   lazy val root =
     Project("root", file("."))
-      .aggregate(core, coreTest, feature)
+      .aggregate(core, coreTest, feature, spark)
 
   // Project: macros
   lazy val macros =

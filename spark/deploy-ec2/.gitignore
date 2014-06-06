@@ -1,0 +1,3 @@
+*.pem
+goup_vars/*.yml
+hosts

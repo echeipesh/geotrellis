@@ -34,8 +34,8 @@ object Dependencies {
   val jts           = "com.vividsolutions"  %  "jts"             % "1.13"
 
   val akkaKernel    = "com.typesafe.akka" %% "akka-kernel"  % Version.akka
-  val akkaRemote    = "com.typesafe.akka" %% "akka-remote"  % Version.akka
-  val akkaActor     = "com.typesafe.akka" %% "akka-actor"   % Version.akka
+  val akkaRemote    = "org.spark-project.akka" %% "akka-remote"  % "2.2.3-shaded-protobuf"
+  val akkaActor     = "org.spark-project.akka" %% "akka-actor"   % "2.2.3-shaded-protobuf"
   val akkaCluster   = "com.typesafe.akka" %% "akka-cluster" % Version.akka
   
   val jacksonCore   = "org.codehaus.jackson" % "jackson-core-asl"   % Version.jackson

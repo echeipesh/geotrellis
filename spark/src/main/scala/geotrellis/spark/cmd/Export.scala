@@ -106,7 +106,7 @@ object Export extends ArgMain[ExportArgs] with Logging {
     }
 
     val tiles =
-      reader.map(_.toTile(meta, zoom))
+      reader.map(_.toTile(meta, zoom)) //meta needed to know tile size and data type
         .toList
         .sortWith(compare)
         .map(_.raster)

@@ -23,6 +23,7 @@ import geotrellis.spark.tiling.TmsTiling
 
 import geotrellis.spark.cmd.TmsArgs
 import org.apache.hadoop.fs.Path
+import geotrellis.render.png._    
 
 object TmsHttpActor {
   /**
@@ -41,12 +42,6 @@ trait TmsHttpService extends HttpService {
   val args: TmsArgs
   val sc = args.sparkContext("TMS Service")
 
-  def RenderRasterToPng(r: Raster): Array[Byte] = {
-    import geotrellis.render.png._    
-
-    Encoder(Settings(Rgba, PaethFilter)).writeByteArray(r)
-  }
-
   def rootRoute = 
   pathPrefix("tms" / Segment / IntNumber / IntNumber / IntNumber ) { (layer, zoom, x , y) =>
     //TODO - refactor this out to utility, maybe there is a Pyramid Raster? I don't know
@@ -58,7 +53,9 @@ trait TmsHttpService extends HttpService {
     //What is the TileID that I actually want?
     val tilePng = rdd
       .filter(_.id == TmsTiling.tileId(x, y, zoom))
-      .map(t => RenderRasterToPng(t.raster))
+      .map{ t => 
+        Encoder(Settings(Rgba, PaethFilter)).writeByteArray(t.raster)
+       }
       .first
 
 

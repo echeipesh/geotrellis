@@ -16,10 +16,10 @@ import geotrellis.process.{Error, Complete}
 import geotrellis.render.ColorRamps
 import geotrellis.statistics.Histogram
 import geotrellis.render.png.Renderer
+import geotrellis.spark.tiling.{TileExtent, TmsTiling}
 
 import geotrellis.spark.metadata.PyramidMetadata
-import geotrellis.spark.rdd.RasterRDD
-import geotrellis.spark.tiling.TmsTiling
+import geotrellis.spark.rdd.{RasterRDD, RasterHadoopRDD}
 
 import geotrellis.spark.cmd.TmsArgs
 import org.apache.hadoop.fs.Path
@@ -48,7 +48,8 @@ trait TmsHttpService extends HttpService {
     //val reader = RasterReader(s"${args.inputraster}/$layer/$zoom", args.hadoopConf)
     val pyramidPath = new Path(s"${args.root}/$layer")    
     val meta = PyramidMetadata(pyramidPath, args.hadoopConf) //TODO - refactor hadoop conf out to implicit
-    val rdd = RasterRDD(s"$pyramidPath/$zoom", sc)
+    val extent = TileExtent(x,y,x,y)
+    val rdd = RasterRDD(s"$pyramidPath/$zoom",extent, sc)
 
     //What is the TileID that I actually want?
     val tilePng = rdd

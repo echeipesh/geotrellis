@@ -25,6 +25,8 @@ import geotrellis.spark.op.local.MultiplyOpMethods
 import geotrellis.spark.op.local.SubtractOpMethods
 import geotrellis.spark.formats.ArgWritable
 import geotrellis.spark.formats.TileIdWritable
+import org.apache.hadoop.mapreduce.Job
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat
 
 import org.apache.spark.Partition
 import org.apache.spark.SparkContext
@@ -89,4 +91,12 @@ object RasterRDD {
 
   def apply(raster: Path, sc: SparkContext, addUserNoData: Boolean): RasterRDD =
     RasterHadoopRDD(raster, sc).toRasterRDD(addUserNoData)
+
+  def apply(raster: String, extent: TileExtent, sc: SparkContext): RasterRDD =
+    apply(new Path(raster), extent, sc)
+
+  def apply(raster: Path, extent: TileExtent, sc: SparkContext): RasterRDD = {
+    RasterHadoopRDD(raster, extent, sc).toRasterRDD(false)
+  }
+
 }

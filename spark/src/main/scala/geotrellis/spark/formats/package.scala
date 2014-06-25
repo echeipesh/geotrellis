@@ -24,6 +24,9 @@ import geotrellis.spark.cmd.NoDataHandler
 import org.apache.hadoop.io.Writable
 
 package object formats {
+  /**
+   * TileID -> ByteArray tuple implementing write interface for hadoop with raster in bin format
+   */
   type WritableTile = (TileIdWritable, ArgWritable)
 
   implicit class WritableTileWrapper(wt: WritableTile) {

@@ -51,7 +51,7 @@ case class RasterReader(
     private var curValue: ArgWritable = new ArgWritable
 
     // initialize readers and partitioner
-    private val readers = getReaders
+    private val readers = getReaders //TODO: This needs to not open ALL the readers from the start
     private val partitioner = TileIdPartitioner(raster, conf)
 
     private var readFirstKey: Boolean = false
@@ -125,7 +125,9 @@ case class RasterReader(
       val readers = for {
         dir <- dirs
         if (isMapFileDir(dir))
-      } yield new MapFile.Reader(fs, dir.toUri().toString(), conf)
+      } yield {
+        new MapFile.Reader(fs, dir.toUri().toString(), conf)
+      }
 
       readers
     }

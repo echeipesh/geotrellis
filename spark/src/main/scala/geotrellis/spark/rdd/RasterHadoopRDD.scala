@@ -29,6 +29,7 @@ import org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat
 import org.apache.spark.SparkContext._
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.NewHadoopRDD
+import geotrellis.spark.tiling._
 
 /*
  * An RDD abstraction of rasters in Spark. This can give back either tuples of either
@@ -80,6 +81,17 @@ object RasterHadoopRDD {
     val globbedPath = new Path(raster.toUri().toString() + SeqFileGlob)
     FileInputFormat.addInputPath(job, globbedPath)
     val updatedConf = job.getConfiguration
-    new RasterHadoopRDD(raster, sc, updatedConf)
+    RasterHadoopRDD(raster, sc)
+  }
+
+  def apply(raster: String, extent: TileExtent, sc: SparkContext): CroppedRasterHadoopRDD =
+    apply(new Path(raster), extent, sc)
+
+  def apply(raster: Path, extent: TileExtent, sc: SparkContext): CroppedRasterHadoopRDD = {
+    val job = new Job(sc.hadoopConfiguration)
+    val globbedPath = new Path(raster.toUri().toString() + SeqFileGlob)
+    FileInputFormat.addInputPath(job, globbedPath)
+    val updatedConf = job.getConfiguration
+    CroppedRasterHadoopRDD(raster, extent, sc)
   }
 }

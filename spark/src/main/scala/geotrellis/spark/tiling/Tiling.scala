@@ -23,7 +23,19 @@ case class TileCoord(tx: Long, ty: Long)
 case class TileExtent(xmin: Long, ymin: Long, xmax: Long, ymax: Long) {
   def width = xmax - xmin + 1
   def height = ymax - ymin + 1
-} 
+
+  /**
+   * Return a range from min tileId to max tileID for every row in the extent
+   */
+  def getRowRanges(zoom: Int): Seq[(Long, Long)] = 
+    for (y <- ymin to ymax) 
+    yield (TmsTiling.tileId(xmin, y, zoom), TmsTiling.tileId(xmax, y, zoom))
+
+  def contains(zoom: Int)(tileId: Long) = {
+    val (x, y) = TmsTiling.tileXY(tileId, zoom)
+    (x <= xmax && x >= xmin) && (y <= ymax && y >= ymin)
+  }
+}
 
 // width/height is non-inclusive 
 case class PixelExtent(xmin: Long, ymin: Long, xmax: Long, ymax: Long) {

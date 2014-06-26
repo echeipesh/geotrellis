@@ -91,14 +91,9 @@ object CroppedRasterHadoopRDD {
   final val SeqFileGlob = "/*[0-9]*/data"
 
   def apply(raster: Path, extent: TileExtent, zoom: Int, meta:  PyramidMetadata)
-      (implicit sc: SparkContext): CroppedRasterHadoopRDD = {
-
-    // ???: Is this optional? I can make this class without calling this method, why shouldn't I?
-    val job = new Job(sc.hadoopConfiguration)
-    val globbedPath = new Path(raster.toUri().toString() + SeqFileGlob)
-    FileInputFormat.addInputPath(job, globbedPath)
-    val updatedConf = job.getConfiguration
-    new CroppedRasterHadoopRDD(raster, extent, zoom, meta, sc, updatedConf)
+      (implicit sc: SparkContext, hc: Configuration): CroppedRasterHadoopRDD = {
+    //we expect that hc was updated to include the files needed and Job
+    new CroppedRasterHadoopRDD(raster, extent, zoom, meta, sc, hc)
   }
 
 }

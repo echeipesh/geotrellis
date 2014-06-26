@@ -365,7 +365,8 @@ object GeotrellisBuild extends Build {
           "com.quantifind" %% "sumac" % "0.2.3",
           scalatest % "test",            
           spire,
-          sprayRouting, sprayCan
+          sprayRouting, sprayCan,
+          scalaz
         ),
       resolvers += "Cloudera Repo" at "https://repository.cloudera.com/artifactory/cloudera-repos"
     ) ++ 

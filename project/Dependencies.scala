@@ -62,4 +62,6 @@ object Dependencies {
 
   val slick         = "com.typesafe.slick" %% "slick"      % "2.0.1"
   val postgresql    = "postgresql"         % "postgresql"  % "9.1-901.jdbc4"
+
+  val scalaz        = "org.scalaz" %% "scalaz-core" % "7.0.6"
 }

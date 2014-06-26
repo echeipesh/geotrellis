@@ -11,6 +11,8 @@ import geotrellis.spark.tiling.{TileExtent, TmsTiling}
 
 import org.apache.hadoop.fs.Path
 
+import scalaz.Memo._
+
 import spray.http.MediaTypes
 import spray.http.StatusCodes._
 import spray.routing.{ExceptionHandler, HttpService}
@@ -33,10 +35,14 @@ trait TmsHttpService extends HttpService {
   val args: TmsArgs
   implicit val sc = args.sparkContext("TMS Service")
 
+  val pyramids: String => TmsPyramid = immutableHashMapMemo{ layer => 
+    new TmsPyramid(new Path(s"${args.root}/$layer"))
+  }
+
   def rootRoute = 
   pathPrefix("tms" / Segment / IntNumber / IntNumber / IntNumber ) { (layer, zoom, x , y) =>
     //I want some code like:
-    val pyramid = new TmsPyramid(new Path(s"${args.root}/$layer"))
+    val pyramid = pyramids(layer)
     val extent = TileExtent(x,y,x,y)
     val rdd = pyramid.rdd(zoom, extent) //this will return a partial rdd
 

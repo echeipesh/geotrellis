@@ -83,15 +83,4 @@ object RasterHadoopRDD {
     val updatedConf = job.getConfiguration
     RasterHadoopRDD(raster, sc)
   }
-
-  def apply(raster: String, extent: TileExtent, sc: SparkContext): CroppedRasterHadoopRDD =
-    apply(new Path(raster), extent, sc)
-
-  def apply(raster: Path, extent: TileExtent, sc: SparkContext): CroppedRasterHadoopRDD = {
-    val job = new Job(sc.hadoopConfiguration)
-    val globbedPath = new Path(raster.toUri().toString() + SeqFileGlob)
-    FileInputFormat.addInputPath(job, globbedPath)
-    val updatedConf = job.getConfiguration
-    CroppedRasterHadoopRDD(raster, extent, sc)
-  }
 }

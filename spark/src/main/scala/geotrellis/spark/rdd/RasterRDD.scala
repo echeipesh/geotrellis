@@ -91,12 +91,4 @@ object RasterRDD {
 
   def apply(raster: Path, sc: SparkContext, addUserNoData: Boolean): RasterRDD =
     RasterHadoopRDD(raster, sc).toRasterRDD(addUserNoData)
-
-  def apply(raster: String, extent: TileExtent, sc: SparkContext): RasterRDD =
-    apply(new Path(raster), extent, sc)
-
-  def apply(raster: Path, extent: TileExtent, sc: SparkContext): RasterRDD = {
-    RasterHadoopRDD(raster, extent, sc).toRasterRDD(false)
-  }
-
 }

@@ -1,5 +1,10 @@
 package geotrellis.spark.rdd
 
+
+/**
+ * This is copy pasted from spark code base because it was private to [apache]
+ */
+
 import java.lang.{Integer => JInteger, Boolean => JBoolean}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.mapreduce.{TaskAttemptContext, TaskAttemptID, JobContext, JobID}

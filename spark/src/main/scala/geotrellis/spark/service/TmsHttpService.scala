@@ -1,29 +1,20 @@
 package geotrellis.spark.service
 
 import akka.actor._
-import spray.util.LoggingContext
-import spray.routing.ExceptionHandler
-import spray.http.StatusCodes._
-
-import spray.routing.{ExceptionHandler, HttpService}
-import spray.http.MediaTypes
-import spray.http.StatusCodes.InternalServerError
-import spray.util.LoggingContext
 
 import geotrellis._
-import geotrellis.source.{ValueSource, RasterSource}
-import geotrellis.process.{Error, Complete}
-import geotrellis.render.ColorRamps
-import geotrellis.statistics.Histogram
-import geotrellis.render.png.Renderer
+import geotrellis.raster.render.png._    
+import geotrellis.spark.cmd.TmsArgs
+import geotrellis.spark.metadata.PyramidMetadata
+import geotrellis.spark.rdd.{RasterRDD, RasterHadoopRDD, TmsPyramid}
 import geotrellis.spark.tiling.{TileExtent, TmsTiling}
 
-import geotrellis.spark.metadata.PyramidMetadata
-import geotrellis.spark.rdd.{RasterRDD, RasterHadoopRDD}
-
-import geotrellis.spark.cmd.TmsArgs
 import org.apache.hadoop.fs.Path
-import geotrellis.render.png._    
+
+import spray.http.MediaTypes
+import spray.http.StatusCodes._
+import spray.routing.{ExceptionHandler, HttpService}
+import spray.util.LoggingContext
 
 object TmsHttpActor {
   /**
@@ -40,22 +31,21 @@ class TmsHttpActor(val args: TmsArgs) extends Actor with TmsHttpService {
 
 trait TmsHttpService extends HttpService {
   val args: TmsArgs
-  val sc = args.sparkContext("TMS Service")
+  implicit val sc = args.sparkContext("TMS Service")
 
   def rootRoute = 
   pathPrefix("tms" / Segment / IntNumber / IntNumber / IntNumber ) { (layer, zoom, x , y) =>
-    //TODO - refactor this out to utility, maybe there is a Pyramid Raster? I don't know
-    //val reader = RasterReader(s"${args.inputraster}/$layer/$zoom", args.hadoopConf)
-    val pyramidPath = new Path(s"${args.root}/$layer")    
-    val meta = PyramidMetadata(pyramidPath, args.hadoopConf) //TODO - refactor hadoop conf out to implicit
+    //I want some code like:
+    val pyramid = new TmsPyramid(new Path(s"${args.root}/$layer"))
     val extent = TileExtent(x,y,x,y)
-    val rdd = RasterRDD(s"$pyramidPath/$zoom",extent, sc)
+    val rdd = pyramid.rdd(zoom, extent) //this will return a partial rdd
+
 
     //What is the TileID that I actually want?
     val tilePng = rdd
       .filter(_.id == TmsTiling.tileId(x, y, zoom))
       .map{ t => 
-        Encoder(Settings(Rgba, PaethFilter)).writeByteArray(t.raster)
+        Encoder(Settings(Rgba, PaethFilter)).writeByteArray(t.tile)
        }
       .first
 

@@ -25,7 +25,10 @@ import org.apache.hadoop.conf.{Configurable, Configuration}
 * (TileIdWritable, ArgWritable) or (Long, Raster), the latter being the deserialized
 * form of the former. See companion object
 */
-class CroppedRasterHadoopRDD private (raster: Path, extent: TileExtent, sc: SparkContext, conf: Configuration)
+class CroppedRasterHadoopRDD private (
+    raster: Path, extent: TileExtent, 
+    zoom: Int, meta: PyramidMetadata,
+    sc: SparkContext, conf: Configuration)
   extends FilteredHadoopRDD[TileIdWritable, ArgWritable](
     sc,
     classOf[SequenceFileInputFormat[TileIdWritable, ArgWritable]],
@@ -47,9 +50,6 @@ class CroppedRasterHadoopRDD private (raster: Path, extent: TileExtent, sc: Spar
 
   @transient private val jobId = new JobID(jobtrackerId, id)
   @transient val pyramidPath = raster.getParent()
-  val zoom = raster.getName().toInt
-  val meta = PyramidMetadata(pyramidPath, conf)
-
 
   /**
    * returns true if specific partition has TileIDs for extent
@@ -80,30 +80,25 @@ class CroppedRasterHadoopRDD private (raster: Path, extent: TileExtent, sc: Spar
 
   def toRasterRDD(addUserNoData: Boolean = false): RasterRDD =
     mapPartitions { partition =>
-      partition.map { writableTile =>
-        writableTile.toTile(meta, zoom, addUserNoData)
+      partition.map { writableTile =>        
+        writableTile.toTmsTile(meta, zoom, addUserNoData)
       }
     }
-      .withContext(Context(zoom, meta, partitioner.get)) // .get is safe because it can't be 'None'
+    .withContext(Context(zoom, meta, partitioner.get)) // .get is safe because it can't be 'None'
 }
 
 object CroppedRasterHadoopRDD {
-
   final val SeqFileGlob = "/*[0-9]*/data"
 
-  /* raster - fully qualified path to the raster (with zoom level)
-   * 	e.g., file:///tmp/my`pyramid/10 or hdfs:///geotrellis/images/mypyramid/10
-   *
-   * sc - the spark context
-   */
-  def apply(raster: String,extent: TileExtent, sc: SparkContext): CroppedRasterHadoopRDD =
-    apply(new Path(raster), extent, sc)
+  def apply(raster: Path, extent: TileExtent, zoom: Int, meta:  PyramidMetadata)
+      (implicit sc: SparkContext): CroppedRasterHadoopRDD = {
 
-  def apply(raster: Path, extent: TileExtent, sc: SparkContext): CroppedRasterHadoopRDD = {
+    // ???: Is this optional? I can make this class without calling this method, why shouldn't I?
     val job = new Job(sc.hadoopConfiguration)
     val globbedPath = new Path(raster.toUri().toString() + SeqFileGlob)
     FileInputFormat.addInputPath(job, globbedPath)
     val updatedConf = job.getConfiguration
-    new CroppedRasterHadoopRDD(raster, extent, sc, updatedConf)
+    new CroppedRasterHadoopRDD(raster, extent, zoom, meta, sc, updatedConf)
   }
+
 }

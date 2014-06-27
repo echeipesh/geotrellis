@@ -41,16 +41,6 @@ class CroppedRasterHadoopRDD private (
    */
   override val partitioner = Some(TileIdPartitioner(raster, conf))
 
-  private val confBroadcast = sc.broadcast(new SerializableWritable(conf))
-
-  private val jobtrackerId: String = {
-    val formatter = new SimpleDateFormat("yyyyMMddHHmm")
-    formatter.format(new Date())
-  }
-
-  @transient private val jobId = new JobID(jobtrackerId, id)
-  @transient val pyramidPath = raster.getParent()
-
   /**
    * returns true if specific partition has TileIDs for extent
    */

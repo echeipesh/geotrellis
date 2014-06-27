@@ -31,10 +31,13 @@ case class TileExtent(xmin: Long, ymin: Long, xmax: Long, ymax: Long) {
     for (y <- ymin to ymax) 
     yield (TmsTiling.tileId(xmin, y, zoom), TmsTiling.tileId(xmax, y, zoom))
 
-  def contains(zoom: Int)(tileId: Long) = {
+  def contains(zoom: Int)(tileId: Long): Boolean = {
     val (x, y) = TmsTiling.tileXY(tileId, zoom)
-    (x <= xmax && x >= xmin) && (y <= ymax && y >= ymin)
+    contains(x, y)
   }
+  
+  def contains(x: Long, y: Long): Boolean = 
+    (x <= xmax && x >= xmin) && (y <= ymax && y >= ymin)
 }
 
 // width/height is non-inclusive 

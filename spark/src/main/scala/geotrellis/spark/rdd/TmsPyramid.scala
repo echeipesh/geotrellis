@@ -15,39 +15,36 @@ import scalaz.Memo._
 object TmsPyramid {
   def fromPath(path: String)(implicit sc: SparkContext): TmsPyramid = 
     new TmsPyramid(new Path(path))
+
+  final val SeqFileGlob = "/*[0-9]*/data"
 }
 
-// TODO: refactor to include TmsLevel which is going to be paramed on zoom
+case class BufferRDD(rdd: RasterRDD, extent: TileExtent)
 
 class TmsPyramid(path: Path)(implicit sc: SparkContext) {
-  // TODO? maybe this just needs to be fully merged into this class?
   val meta = PyramidMetadata(path, sc.hadoopConfiguration)
-  
-  final val SeqFileGlob = "/*[0-9]*/data"
 
   val layerHadoopConfig: (Int => Configuration) = immutableHashMapMemo{ zoom => 
+    /**
+     * This is going to result in one hadoop configuration for each layer.
+     * Each configuration is going to contain a Job and Paths to the data files
+     */
     val layerPath = new Path(path, s"$zoom")
-    println(layerPath.toString())
     val job = new Job(sc.hadoopConfiguration)
-    val globbedPath = new Path(layerPath.toUri().toString()  + SeqFileGlob)
+    val globbedPath = new Path(layerPath.toUri().toString()  + TmsPyramid.SeqFileGlob)
     FileInputFormat.addInputPath(job, globbedPath)
     job.getConfiguration
   }
 
-  /**
-   * Get a RasterRDD for the entire level of the pyramid
-   */
   def rdd(zoom: Int): RasterRDD = ???
 
-  /**
-   * Get a RasterRDD that is pre-filtered to the given extent.
-   * Those partitions not covered by the extent will not be fetched.
-   */
   def rdd(zoom: Int, extent: TileExtent): RasterRDD = {
     implicit val hadoopConfig = layerHadoopConfig(zoom)
-    CroppedRasterHadoopRDD(new Path(path, s"$zoom"), extent, zoom, meta).toRasterRDD(false)
-    
+    CroppedRasterHadoopRDD(new Path(path, s"$zoom"), extent, zoom, meta).toRasterRDD(false) 
   }
 
-  def tile(zoom: Int, x: Int, y: Int) = ???
+  def getBuffer(zoom: Int, x: Int, y: Int, pad: Int): BufferRDD = {
+    val extent = TileExtent(x - pad, y - pad, x + pad, y + pad)
+    BufferRDD(rdd(zoom, extent), extent)  
+  }
 }

@@ -6,7 +6,7 @@ import geotrellis._
 import geotrellis.raster.render.png._    
 import geotrellis.spark.cmd.TmsArgs
 import geotrellis.spark.metadata.PyramidMetadata
-import geotrellis.spark.rdd.{RasterRDD, RasterHadoopRDD, TmsPyramid}
+import geotrellis.spark.rdd.{RasterRDD, RasterHadoopRDD, TmsPyramid, BufferRDD}
 import geotrellis.spark.tiling.{TileExtent, TmsTiling}
 
 import org.apache.hadoop.fs.Path
@@ -17,6 +17,8 @@ import spray.http.MediaTypes
 import spray.http.StatusCodes._
 import spray.routing.{ExceptionHandler, HttpService}
 import spray.util.LoggingContext
+
+import scala.collection.mutable
 
 object TmsHttpActor {
   /**
@@ -31,35 +33,52 @@ class TmsHttpActor(val args: TmsArgs) extends Actor with TmsHttpService {
   def receive = runRoute(rootRoute)
 }
 
+
+
 trait TmsHttpService extends HttpService {
   val args: TmsArgs
   implicit val sc = args.sparkContext("TMS Service")
 
-  val pyramids: String => TmsPyramid = immutableHashMapMemo{ layer => 
+  val pyramids: (String => TmsPyramid) = immutableHashMapMemo{ layer => 
     new TmsPyramid(new Path(s"${args.root}/$layer"))
   }
+ 
+  //This cache is local to an Actor 
+  // TODO: This should be it's own actor, for certain
+  val cache = mutable.HashMap.empty[(String, Int), BufferRDD]
+  def getBuffer(layer: String, zoom: Int, x: Int, y: Int): RasterRDD = {
+    cache.get((layer, zoom)) match {
+      case None => 
+        val buffer = pyramids(layer).getBuffer(zoom, x, y, 5)
+        cache.update(layer -> zoom, buffer)
+        buffer.rdd
+      
+      case Some(BufferRDD(rdd, extent)) if !extent.contains(x, y) => 
+        cache.remove(layer -> zoom) // TODO: Copy-Paste, this smells
+        val buffer = pyramids(layer).getBuffer(zoom, x, y, 5)
+        cache.update(layer -> zoom, buffer)
+        buffer.rdd
+
+      case Some(BufferRDD(rdd, extent)) if extent.contains(x, y) => 
+        rdd
+    }
+  }
+
 
   def rootRoute = 
   pathPrefix("tms" / Segment / IntNumber / IntNumber / IntNumber ) { (layer, zoom, x , y) =>
-    //I want some code like:
-    val pyramid = pyramids(layer)
-    val extent = TileExtent(x,y,x,y)
-    val rdd = pyramid.rdd(zoom, extent) //this will return a partial rdd
 
+    //This is ok, because hopefully we already had an extent in our cache    
+    val rdd = getBuffer(layer, zoom, x, y)
 
-    //What is the TileID that I actually want?
+    //How do I get a tile from the RDD?
     val tilePng = rdd
       .filter(_.id == TmsTiling.tileId(x, y, zoom))
-      .map{ t => 
-        Encoder(Settings(Rgba, PaethFilter)).writeByteArray(t.tile)
-       }
+      .map{ t => Encoder(Settings(Rgba, PaethFilter)).writeByteArray(t.tile) }
       .first
-
-
 
     //fetch the tile and return it as png
     respondWithMediaType(MediaTypes.`image/png`) { complete { 
-      //rdd.map(t => TmsTiling.tileXY(t.id, zoom)).collect.mkString("\n")
       tilePng
     } }
   }

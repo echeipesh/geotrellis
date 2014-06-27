@@ -9,6 +9,9 @@ import geotrellis.spark.metadata.PyramidMetadata
 import geotrellis.spark.rdd.{RasterRDD, RasterHadoopRDD, TmsPyramid, BufferRDD}
 import geotrellis.spark.tiling.{TileExtent, TmsTiling}
 
+import org.apache.spark.rdd.RDD
+import geotrellis.spark.TmsTile
+
 import org.apache.hadoop.fs.Path
 
 import scalaz.Memo._
@@ -46,7 +49,7 @@ trait TmsHttpService extends HttpService {
   //This cache is local to an Actor 
   // TODO: This should be it's own actor, for certain
   val cache = mutable.HashMap.empty[(String, Int), BufferRDD]
-  def getBuffer(layer: String, zoom: Int, x: Int, y: Int): RasterRDD = {
+  def getBuffer(layer: String, zoom: Int, x: Int, y: Int): RDD[TmsTile] = {
     cache.get((layer, zoom)) match {
       case None => 
         val buffer = pyramids(layer).getBuffer(zoom, x, y, 5)
@@ -56,7 +59,7 @@ trait TmsHttpService extends HttpService {
       case Some(BufferRDD(rdd, extent)) if !extent.contains(x, y) => 
         cache.remove(layer -> zoom) // TODO: Copy-Paste, this smells
         val buffer = pyramids(layer).getBuffer(zoom, x, y, 5)
-        cache.update(layer -> zoom, buffer)
+        cache.update(layer -> zoom, buffer)        
         buffer.rdd
 
       case Some(BufferRDD(rdd, extent)) if extent.contains(x, y) => 

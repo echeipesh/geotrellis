@@ -6,9 +6,11 @@ import org.apache.hadoop.mapreduce.{JobID, Job}
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat
 
 import org.apache.spark.SparkContext
+import org.apache.spark.rdd.RDD
 
 import geotrellis.spark.metadata.PyramidMetadata
-import geotrellis.spark.tiling.TileExtent
+import geotrellis.spark.tiling._
+import geotrellis.spark.TmsTile
 
 import scalaz.Memo._
 
@@ -19,7 +21,7 @@ object TmsPyramid {
   final val SeqFileGlob = "/*[0-9]*/data"
 }
 
-case class BufferRDD(rdd: RasterRDD, extent: TileExtent)
+case class BufferRDD(rdd: RDD[TmsTile], extent: TileExtent)
 
 class TmsPyramid(path: Path)(implicit sc: SparkContext) {
   val meta = PyramidMetadata(path, sc.hadoopConfiguration)
@@ -45,6 +47,6 @@ class TmsPyramid(path: Path)(implicit sc: SparkContext) {
 
   def getBuffer(zoom: Int, x: Int, y: Int, pad: Int): BufferRDD = {
     val extent = TileExtent(x - pad, y - pad, x + pad, y + pad)
-    BufferRDD(rdd(zoom, extent), extent)  
+    BufferRDD(rdd(zoom, extent).persist, extent)  
   }
 }

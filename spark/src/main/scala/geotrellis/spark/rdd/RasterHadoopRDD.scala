@@ -44,7 +44,6 @@ class RasterHadoopRDD private (raster: Path, sc: SparkContext, conf: Configurati
     classOf[TileIdWritable],
     classOf[ArgWritable],
     conf) {
-
   /*
    * Overriding the partitioner with a TileIdPartitioner 
    */
@@ -81,6 +80,6 @@ object RasterHadoopRDD {
     val globbedPath = new Path(raster.toUri().toString() + SeqFileGlob)
     FileInputFormat.addInputPath(job, globbedPath)
     val updatedConf = job.getConfiguration
-    RasterHadoopRDD(raster, sc)
+    new RasterHadoopRDD(raster, sc, updatedConf)
   }
 }

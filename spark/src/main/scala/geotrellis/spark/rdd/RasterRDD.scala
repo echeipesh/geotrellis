@@ -63,7 +63,7 @@ class RasterRDD(val prev: RDD[TmsTile], val opCtx: Context)
         f(tile)
       }
     }, true)
-      .withContext(opCtx)
+    .withContext(opCtx)
 
   def combineTiles(other: RasterRDD)(f: (TmsTile, TmsTile) => TmsTile): RasterRDD =
     zipPartitions(other, true) { (partition1, partition2) =>
@@ -72,7 +72,7 @@ class RasterRDD(val prev: RDD[TmsTile], val opCtx: Context)
           f(tile1, tile2)
       }
     }
-      .withContext(opCtx)
+    .withContext(opCtx)
 }
 
 object RasterRDD {

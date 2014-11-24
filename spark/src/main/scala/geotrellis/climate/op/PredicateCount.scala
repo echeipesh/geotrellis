@@ -9,11 +9,12 @@ import geotrellis.raster.stats._
 import scala.reflect.ClassTag
 
 object PredicateCount {
-  def apply[K: ClassTag](cellType: CellType, predicate: Double=>Double, keyBin: K=>K)(rdd: RasterRDD[K]): RasterRDD[K] = 
-  asRasterRDD(rdd.metaData) {    
-    val bins = rdd.mapTiles{ case (key, tile) => keyBin(key) -> tile.convert(cellType).mapDouble(predicate) }
-    new PairRDDFunctions(bins).reduceByKey{ (t1, t2) => t1.localAdd(t2) }
-  }  
+  def apply[K: ClassTag](cellType: CellType, predicate: Double=>Double, keyBin: K=>K)(rdd: RasterRDD[K]): RasterRDD[K] =  {    
+    asRasterRDD(rdd.metaData.copy(cellType = cellType)) {    
+      val bins = rdd.mapTiles{ case (key, tile) => keyBin(key) -> tile.convert(cellType).mapDouble(predicate) }
+      new PairRDDFunctions(bins).reduceByKey{ (t1, t2) => t1.localAdd(t2) }
+    }  
+  }
 }
 
 object BinSum {

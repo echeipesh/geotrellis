@@ -7,6 +7,9 @@ import geotrellis.raster._
 import geotrellis.spark._
 import geotrellis.spark.cmd.args._
 import geotrellis.spark.io.hadoop._
+import geotrellis.spark.io.accumulo._
+import org.apache.accumulo.core.client.security.tokens.PasswordToken
+
 import org.apache.hadoop.fs.Path
 import org.apache.spark._
 import climate.utils.Utils
@@ -21,19 +24,15 @@ object Calculate extends ArgMain[CalcArgs] with Logging {
     System.setProperty("com.sun.media.jai.disableMediaLib", "true")
 
     implicit val sparkContext = args.sparkContext("Ingest")
-    Utils.addClimateJar(sparkContext)
 
-    //val accumulo = AccumuloInstance(args.instance, args.zookeeper, args.user, new PasswordToken(args.password))
-    //val catalog = accumulo.catalog
+    val accumulo = AccumuloInstance(args.instance, args.zookeeper, args.user, new PasswordToken(args.password))
+    val catalog = accumulo.catalog
+
+    val rdd = catalog.load[SpaceTimeKey](LayerId("pr-rcp45", 2)).get
     
-    val catalog = HadoopCatalog(sparkContext, new Path("hdfs://localhost/catalog"))
-
-    val rdd = catalog.load[SpaceTimeKey](LayerId("rcp45",1)).get
-    println("PARTITIONS", rdd.partitions)
-
-    val pred = { temp: Double => if (temp == Double.NaN) Double.NaN else if (temp > 0) 1 else 0 }
-    val bin =  { key: SpaceTimeKey => key.updateTemporalComponent(key.temporalKey.time.withDayOfMonth(1).withMonthOfYear(1).withHourOfDay(0))}
-    val ret = PredicateCount(TypeByte, pred, bin)(rdd);
-    catalog.save[SpaceTimeKey](LayerId("over-0-daily",1), ret).get
+    val predicate = { pr: Double => if (isNoData(pr)) Double.NaN else if (pr < 1.0) 1 else 0 }
+    val groupBy =  { key: SpaceTimeKey => key.updateTemporalComponent(key.temporalKey.time.withDayOfMonth(1).withMonthOfYear(1).withHourOfDay(0))}
+    val ret = PredicateCount(TypeByte, predicate, groupBy)(rdd);
+    catalog.save[SpaceTimeKey](LayerId("pr-very-dry",2), "results", ret, true).get
   }
 }

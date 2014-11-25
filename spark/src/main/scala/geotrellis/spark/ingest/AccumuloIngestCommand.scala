@@ -5,6 +5,7 @@ import geotrellis.spark.cmd.args.AccumuloArgs
 import geotrellis.spark.io.hadoop._
 import geotrellis.spark.io.accumulo._
 import geotrellis.spark.tiling._
+import geotrellis.spark.utils.SparkUtils
 import geotrellis.vector.Extent
 import geotrellis.proj4._
 import org.apache.accumulo.core.client.security.tokens.PasswordToken
@@ -26,10 +27,9 @@ object AccumuloIngestCommand extends ArgMain[AccumuloIngestArgs] with Logging {
   def main(args: AccumuloIngestArgs): Unit = {
     System.setProperty("com.sun.media.jai.disableMediaLib", "true")
 
-    val conf = args.hadoopConf
+    implicit val sparkContext = SparkUtils.createSparkContext("Ingest")
+    val conf = sparkContext.hadoopConfiguration
     conf.set("io.map.index.interval", "1")
-
-    implicit val sparkContext = args.sparkContext("Ingest")
 
     val accumulo = AccumuloInstance(args.instance, args.zookeeper, args.user, new PasswordToken(args.password))
     val source = sparkContext.hadoopGeoTiffRDD(args.inPath)

@@ -2,11 +2,12 @@ package geotrellis.spark.ingest
 
 import geotrellis.raster.CellType
 import geotrellis.spark._
-import geotrellis.spark.cmd.args.{AccumuloArgs, SparkArgs}
+import geotrellis.spark.cmd.args.{AccumuloArgs}
 import geotrellis.spark.tiling._
 import geotrellis.spark.io.accumulo._
 import geotrellis.spark.io.hadoop._
 import geotrellis.spark.io.hadoop.formats.NetCdfBand
+import geotrellis.spark.utils.SparkUtils
 import org.apache.accumulo.core.client.security.tokens.PasswordToken
 import org.apache.hadoop.fs.Path
 import org.apache.spark._
@@ -22,10 +23,9 @@ object NetCDFIngestCommand extends ArgMain[AccumuloIngestArgs] with Logging {
   def main(args: AccumuloIngestArgs): Unit = {
     System.setProperty("com.sun.media.jai.disableMediaLib", "true")
 
-    val conf = args.hadoopConf
+    implicit val sparkContext = SparkUtils.createSparkContext("Ingest")
+    val conf = sparkContext.hadoopConfiguration
     conf.set("io.map.index.interval", "1")
-
-    implicit val sparkContext = args.sparkContext("Ingest")
 
     implicit val tiler: Tiler[NetCdfBand, SpaceTimeKey] = {
       val getExtent = (inKey: NetCdfBand) => inKey.extent

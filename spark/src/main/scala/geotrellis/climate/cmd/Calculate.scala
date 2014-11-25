@@ -8,22 +8,21 @@ import geotrellis.spark._
 import geotrellis.spark.cmd.args._
 import geotrellis.spark.io.hadoop._
 import geotrellis.spark.io.accumulo._
+import geotrellis.spark.utils.SparkUtils
 import org.apache.accumulo.core.client.security.tokens.PasswordToken
 
 import org.apache.hadoop.fs.Path
 import org.apache.spark._
 import climate.utils.Utils
 
-class CalcArgs extends SparkArgs with AccumuloArgs
-
 /**
  * Ingests raw multi-band NetCDF tiles into a re-projected and tiled RasterRDD
  */
-object Calculate extends ArgMain[CalcArgs] with Logging {
-  def main(args: CalcArgs): Unit = {
+object Calculate extends ArgMain[AccumuloArgs] with Logging {
+  def main(args: AccumuloArgs): Unit = {
     System.setProperty("com.sun.media.jai.disableMediaLib", "true")
 
-    implicit val sparkContext = args.sparkContext("Ingest")
+    implicit val sparkContext = SparkUtils.createSparkContext("Ingest")
 
     val accumulo = AccumuloInstance(args.instance, args.zookeeper, args.user, new PasswordToken(args.password))
     val catalog = accumulo.catalog

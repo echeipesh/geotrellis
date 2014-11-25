@@ -7,6 +7,7 @@ import geotrellis.spark.io.accumulo._
 import geotrellis.spark.ingest._
 import geotrellis.spark.io.hadoop._
 import geotrellis.spark.io.hadoop.formats.NetCdfBand
+import geotrellis.spark.utils.SparkUtils
 import org.apache.accumulo.core.client.security.tokens.PasswordToken
 import org.apache.spark._
 import com.quantifind.sumac.ArgMain
@@ -18,10 +19,9 @@ object NetCDFIngestHDFSCommand extends ArgMain[HadoopIngestArgs] with Logging {
   def main(args: HadoopIngestArgs): Unit = {
     System.setProperty("com.sun.media.jai.disableMediaLib", "true")
 
-    val conf = args.hadoopConf
+    implicit val sparkContext = SparkUtils.createSparkContext("Ingest")
+    val conf = sparkContext.hadoopConfiguration
     conf.set("io.map.index.interval", "1")
-
-    implicit val sparkContext = args.sparkContext("Ingest")
 
     implicit val tiler: Tiler[NetCdfBand, SpaceTimeKey] = {
       val getExtent = (inKey: NetCdfBand) => inKey.extent

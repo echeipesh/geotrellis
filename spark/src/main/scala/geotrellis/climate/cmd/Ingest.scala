@@ -5,6 +5,7 @@ import geotrellis.spark.tiling._
 import geotrellis.spark.io.hadoop._
 import geotrellis.spark.ingest.{Ingest, Pyramid, HadoopIngestArgs}
 import geotrellis.spark.io.hadoop.formats._
+import geotrellis.spark.utils.SparkUtils
 
 import org.apache.spark._
 import com.quantifind.sumac.ArgMain
@@ -16,13 +17,13 @@ object HDFSIngest extends ArgMain[HadoopIngestArgs] with Logging {
   def main(args: HadoopIngestArgs): Unit = {
     System.setProperty("com.sun.media.jai.disableMediaLib", "true")
 
-    val conf = args.hadoopConf
+
+    implicit val sparkContext = SparkUtils.createSparkContext("Ingest")
+    val conf = sparkContext.hadoopConfiguration
     conf.set("io.map.index.interval", "1")
 
-    implicit val sparkContext = args.sparkContext("Ingest")
-
     val catalog: HadoopCatalog = HadoopCatalog(sparkContext, args.catalogPath)
-    val source = sparkContext.netCdfRDD(args.inPath)
+    val source = sparkContext.netCdfRDD(args.inPath).repartition(12);
 
     val layoutScheme = ZoomedLayoutScheme(256)
     val (level, rdd) =  Ingest[NetCdfBand, SpaceTimeKey](source, args.destCrs, layoutScheme, true)

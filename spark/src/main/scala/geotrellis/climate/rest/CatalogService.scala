@@ -1,7 +1,6 @@
 package climate.rest
 
 
-
 import akka.actor.ActorSystem
 import com.quantifind.sumac.{ ArgApp, ArgMain }
 
@@ -10,10 +9,11 @@ import geotrellis.raster._
 import geotrellis.raster.io.geotiff.Nodata
 import geotrellis.raster.render._
 import geotrellis.spark._
-import geotrellis.spark.cmd.args.{ AccumuloArgs, SparkArgs, HadoopArgs }
+import geotrellis.spark.cmd.args._
 import geotrellis.spark.io.accumulo._
 import geotrellis.spark.json._
 import geotrellis.spark.tiling._
+import geotrellis.spark.utils.SparkUtils
 import geotrellis.vector.reproject._
 
 import org.apache.accumulo.core.client.security.tokens.PasswordToken
@@ -42,15 +42,13 @@ trait CORSSupport { self: HttpService =>
   }
 }
 
-class TmsArgs extends SparkArgs with AccumuloArgs with HadoopArgs
-
 /**
  * Catalog and TMS service for TimeRaster layers only
  * This is intended to exercise the machinery more than being a serious service.
  */
-object CatalogService extends ArgApp[TmsArgs] with SimpleRoutingApp with SprayJsonSupport with CORSSupport {
+object CatalogService extends ArgApp[AccumuloArgs] with SimpleRoutingApp with SprayJsonSupport with CORSSupport {
   implicit val system = ActorSystem("spray-system")
-  implicit val sc = argHolder.sparkContext("Catalog Service") // for geotrellis
+  implicit val sparkContext = SparkUtils.createSparkContext("Catalog")
 
   val accumulo = AccumuloInstance(argHolder.instance, argHolder.zookeeper,
     argHolder.user, new PasswordToken(argHolder.password))

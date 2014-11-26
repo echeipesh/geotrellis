@@ -9,6 +9,7 @@ import org.apache.hadoop.mapreduce.Job
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
 import org.apache.spark.rdd.RDD
+import scala.collection.mutable
 import scala.util.{ Failure, Try }
 import scala.collection.JavaConversions._
 
@@ -35,6 +36,11 @@ trait AccumuloDriver[K] {
       // Create table if it doesn't exist.
       if (!accumulo.connector.tableOperations().exists(table))
         accumulo.connector.tableOperations().create(table)
+
+      val ops = accumulo.connector.tableOperations()
+      val groups = ops.getLocalityGroups(table)
+      val newGroup: java.util.Set[Text] = Set(new Text(layerId.name))
+      ops.setLocalityGroups(table, groups.updated(table, newGroup))
 
       // TODO: this relies on RasterDriver and TimeRasterDrive having the same key row, true for now, not in the future
       val gridBounds = raster.metaData.mapTransform(raster.metaData.extent)

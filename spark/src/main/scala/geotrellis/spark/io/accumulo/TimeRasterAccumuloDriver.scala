@@ -15,7 +15,7 @@ import scala.collection.JavaConversions._
 import scala.collection.mutable
 
 object TimeRasterAccumuloDriver extends AccumuloDriver[SpaceTimeKey] {
-  def rowId(layerId: LayerId, col: Int, row: Int) = new Text(s"${layerId.zoom}_${col}_${row}")
+  def rowId(layerId: LayerId, col: Int, row: Int) = new Text(f"${layerId.zoom}%02d_${col}%06d_${row}%06d")
   val rowIdRx = """(\d+)_(\d+)_(\d+)""".r // (zoom)_(SpatialKey.col)_(SpatialKey.row)
 
   /** Map rdd of indexed tiles to tuples of (table name, row mutation) */
@@ -43,8 +43,8 @@ object TimeRasterAccumuloDriver extends AccumuloDriver[SpaceTimeKey] {
 
   def setZoomBounds(job: Job, layerId: LayerId): Unit = {
     val range = new ARange(
-      new Text(s"${layerId.zoom}"),
-      new Text(s"${layerId.zoom+1}")
+      new Text(f"${layerId.zoom}%02d"),
+      new Text(f"${layerId.zoom+1}%02d")
     ) :: Nil
     InputFormatBase.setRanges(job, range)
   }

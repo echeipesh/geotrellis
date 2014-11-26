@@ -1,8 +1,9 @@
 package geotrellis.spark.op
 
-/**
- * Created by eugene on 11/26/14.
- */
-package object stats {
+import geotrellis.spark.RasterRDD
+import scala.reflect.ClassTag
 
+package object stats {
+  implicit class StatsRasterRDDSourceExtensions[K](val rasterRDD: RasterRDD[K])(implicit val keyClassTag: ClassTag[K])
+    extends StatsRasterRDDMethods[K] { }
 }

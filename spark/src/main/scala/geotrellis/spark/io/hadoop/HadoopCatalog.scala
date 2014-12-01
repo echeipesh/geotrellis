@@ -186,7 +186,12 @@ class HadoopCatalog private (
 
       writeSplits(splits, path, conf)
       logInfo(s"Finished saving tiles to ${path}")
-      metaDataCatalog.save(id, subDir, rdd.metaData, clobber)
+      val metaData = LayerMetaData(
+        keyClass = classTag[K].toString,
+        rasterMetaData = rdd.metaData,
+        histogram = None
+      )
+      metaDataCatalog.save(id, subDir, metaData, clobber)
     }
 }
 

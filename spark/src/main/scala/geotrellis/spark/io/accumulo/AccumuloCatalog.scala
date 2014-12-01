@@ -5,6 +5,7 @@ import geotrellis.spark.io._
 import org.apache.spark.SparkContext
 import scala.reflect._
 import scala.util.{Failure, Success, Try}
+import geotrellis.spark.op.stats._
 
 class AccumuloCatalog(sc: SparkContext, instance: AccumuloInstance, 
   val metaDataCatalog: AccumuloMetaDataCatalog, 
@@ -27,7 +28,13 @@ class AccumuloCatalog(sc: SparkContext, instance: AccumuloInstance,
   def save[K: SupportedKey : ClassTag](id: LayerId, table: String, rdd: RasterRDD[K], clobber: Boolean): Try[Unit] = {
     val driver = implicitly[AccumuloDriver[K]]
     driver.save(sc, instance)(id, rdd, table, clobber)
-    metaDataCatalog.save(id, table: Params, rdd.metaData, clobber)
+
+    val metaData = LayerMetaData(
+      rasterMetaData = rdd.metaData,
+      keyClass = classTag[K].toString,
+      histogram = Some(rdd.histogram)
+    )
+    metaDataCatalog.save(id, table: Params, metaData, clobber)
   }
 }
 

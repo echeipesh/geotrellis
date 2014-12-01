@@ -41,12 +41,12 @@ trait CORSSupport { self: HttpService =>
     respondWithHeaders(corsHeaders) & handleRejections(rh)
   }
 }
-
+class CatalogArgs extends AccumuloArgs
 /**
  * Catalog and TMS service for TimeRaster layers only
  * This is intended to exercise the machinery more than being a serious service.
  */
-object CatalogService extends ArgApp[AccumuloArgs] with SimpleRoutingApp with SprayJsonSupport with CORSSupport {
+object CatalogService extends ArgApp[CatalogArgs] with SimpleRoutingApp with SprayJsonSupport with CORSSupport {
   implicit val system = ActorSystem("spray-system")
   implicit val sparkContext = SparkUtils.createSparkContext("Catalog")
 
@@ -100,16 +100,13 @@ object CatalogService extends ArgApp[AccumuloArgs] with SimpleRoutingApp with Sp
         complete {
           import DefaultJsonProtocol._
 
-          accumulo.metaDataCatalog.fetchAll.mapValues(_._1).toSeq.map {
-            case (layer, md) =>                          
+          accumulo.metaDataCatalog.fetchAll.toSeq.map {
+            case (key, lmd) =>
+              val (layer, table) = key
+              val md = lmd.rasterMetaData
               val center = md.extent.reproject(md.crs, LatLng).center
-              val breaks = {
-                (if (layer.name == "NLCD")
-                  Histogram(catalog.load[SpatialKey](layer).get)
-                else
-                  Histogram(catalog.load[SpaceTimeKey](layer).get)
-                ).getQuantileBreaks(12)
-              }
+              val breaks = lmd.histogram.get.getQuantileBreaks(12)
+
               JsObject(
                 "layer" -> layer.toJson,
                 "metaData" -> md.toJson,
@@ -122,8 +119,8 @@ object CatalogService extends ArgApp[AccumuloArgs] with SimpleRoutingApp with Sp
     } ~ 
     pathPrefix(Segment / IntNumber) { (name, zoom) =>      
       val layer = LayerId(name, zoom)
-      val (md, params) = accumulo.metaDataCatalog.load(layer).get
-
+      val (lmd, params) = accumulo.metaDataCatalog.load(layer).get
+      val md = lmd.rasterMetaData
       (path("bands") & get) { 
         import DefaultJsonProtocol._
         complete{ future {          

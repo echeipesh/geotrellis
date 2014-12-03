@@ -9,6 +9,7 @@ import geotrellis.spark.io.hadoop._
 import geotrellis.spark.io.accumulo._
 import geotrellis.spark.op.stats._
 import geotrellis.spark.utils.SparkUtils
+import geotrellis.vector.Extent
 import org.apache.accumulo.core.client.security.tokens.PasswordToken
 
 import org.apache.spark._
@@ -30,10 +31,16 @@ object Calculate extends ArgMain[CalculateArgs] with Logging {
 
     val rdd = catalog.load[SpaceTimeKey](LayerId(args.inputLayer, 2)).get
     
-    val ret = rdd
-      .mapKeys { key => key.updateTemporalComponent(key.temporalKey.time.withMonthOfYear(1).withDayOfMonth(1).withHourOfDay(0)) }
-      .averageByKey
+    // val ret = rdd
+    //   .mapKeys { key => key.updateTemporalComponent(key.temporalKey.time.withMonthOfYear(1).withDayOfMonth(1).withHourOfDay(0)) }
+    //   .averageByKey
+    // catalog.save[SpaceTimeKey](LayerId(args.outputLayer,2), "results", ret, true).get
 
-    catalog.save[SpaceTimeKey](LayerId(args.outputLayer,2), "results", ret, true).get
+    import geotrellis.spark.op.zonal.summary._
+    import geotrellis.raster.op.zonal.summary.Max
+    val polygon = Extent(-13193016.062816, 3088377.007329,
+                          -8453323.832114, 5722687.564266)
+    val ret = rdd.zonalSummaryByKey(polygon, Int.MinValue, Max, stk => stk.temporalComponent.time)
+    ret.foreach(println);
   }
 }

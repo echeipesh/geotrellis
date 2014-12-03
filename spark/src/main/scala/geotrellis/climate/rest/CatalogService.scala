@@ -15,6 +15,8 @@ import geotrellis.spark.json._
 import geotrellis.spark.tiling._
 import geotrellis.spark.utils.SparkUtils
 import geotrellis.vector.reproject._
+import geotrellis.vector._
+import geotrellis.vector.json._
 
 import org.apache.accumulo.core.client.security.tokens.PasswordToken
 import org.joda.time.DateTime
@@ -30,6 +32,7 @@ import spray.json._
 import spray.routing._
 import spray.routing.SimpleRoutingApp
 import climate.op._
+import DefaultJsonProtocol._ 
 
 trait CORSSupport { self: HttpService =>
   val corsHeaders = List(`Access-Control-Allow-Origin`(AllOrigins),
@@ -149,12 +152,42 @@ object CatalogService extends ArgApp[CatalogArgs] with SimpleRoutingApp with Spr
       }
     }
   }
+
+  import geotrellis.spark.op.zonal.summary._
+  import geotrellis.raster.op.zonal.summary.Max
+
+  def statsRoute = cors {
+    pathPrefix(Segment / IntNumber) { (name, zoom) =>              
+      val layer = LayerId(name, zoom)
+      println("STATS ROUTE", layer)
+      val (lmd, params) = accumulo.metaDataCatalog.load(layer).get
+      val md = lmd.rasterMetaData
+
+      (path("max")) {
+        entity(as[Extent]) { extent =>
+          import DefaultJsonProtocol._ 
+          complete {                     
+            val list = catalog
+              .load[SpaceTimeKey](layer)
+              .get
+              .zonalSummaryByKey(extent, Int.MinValue, Max, stk => stk.temporalComponent.time)
+
+            list.collect.map { case (date, max) =>
+              JsObject("time" -> JsString(date.toString), "max" -> JsNumber(max))
+            }
+          }
+        }
+      }
+    }
+  }
+
   def root = {
     pathPrefix("catalog") { catalogRoute } ~
-      pathPrefix("tms") { tmsRoute }
+      pathPrefix("tms") { tmsRoute } ~
+      pathPrefix("stats") { statsRoute }
   }
 
   startServer(interface = "localhost", port = 8080) {
-    get(pingPong ~ root)
+    pingPong ~ root
   }
 }

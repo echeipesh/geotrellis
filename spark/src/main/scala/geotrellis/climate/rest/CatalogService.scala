@@ -156,6 +156,16 @@ object CatalogService extends ArgApp[CatalogArgs] with SimpleRoutingApp with Spr
   import geotrellis.spark.op.zonal.summary._
   import geotrellis.raster.op.zonal.summary.Max
 
+  // import scalaz._
+
+  // def getLayer = Memo.mutableHashMapMemo{ layer: LayerId =>
+  //   val rdd = catalog.load[SpaceTimeKey](layer).get
+  //   asRasterRDD(rdd.metaData) {
+  //     rdd.repartition(8).cache
+  //   }
+  // }
+
+
   def statsRoute = cors {
     pathPrefix(Segment / IntNumber) { (name, zoom) =>              
       val layer = LayerId(name, zoom)
@@ -166,9 +176,11 @@ object CatalogService extends ArgApp[CatalogArgs] with SimpleRoutingApp with Spr
       (path("max")) {
         entity(as[Extent]) { extent =>
           import DefaultJsonProtocol._ 
+
+          val bounds = md.mapTransform(extent)
+
           complete {                     
-            val list = catalog
-              .load[SpaceTimeKey](layer)
+            val list = catalog.load[SpaceTimeKey](layer, FilterSet(SpaceFilter[SpaceTimeKey](bounds)))
               .get
               .zonalSummaryByKey(extent, Int.MinValue, Max, stk => stk.temporalComponent.time)
 

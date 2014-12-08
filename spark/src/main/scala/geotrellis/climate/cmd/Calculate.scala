@@ -37,10 +37,13 @@ object Calculate extends ArgMain[CalculateArgs] with Logging {
     // catalog.save[SpaceTimeKey](LayerId(args.outputLayer,2), "results", ret, true).get
 
     import geotrellis.spark.op.zonal.summary._
-    import geotrellis.raster.op.zonal.summary.Max
+    import geotrellis.raster.op.zonal.summary._
     val polygon = Extent(-13193016.062816, 3088377.007329,
                           -8453323.832114, 5722687.564266)
-    val ret = rdd.zonalSummaryByKey(polygon, Int.MinValue, Max, stk => stk.temporalComponent.time)
-    ret.foreach(println);
+    
+    val min = rdd.zonalSummaryByKey(polygon, Int.MinValue, Min, stk => stk.temporalComponent.time)
+    val max = rdd.zonalSummaryByKey(polygon, Int.MinValue, Max, stk => stk.temporalComponent.time)
+    val mean = rdd.zonalSummaryByKey(polygon, MeanResult(0.0, 0L), Mean, (a: MeanResult, b: MeanResult) => a + b, stk => stk.temporalComponent.time)
+    min zip max zip mean foreach (println)
   }
 }

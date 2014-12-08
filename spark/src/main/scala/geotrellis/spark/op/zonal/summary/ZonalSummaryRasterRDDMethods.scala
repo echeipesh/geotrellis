@@ -24,8 +24,7 @@ trait ZonalSummaryRasterRDDMethods[K] extends RasterRDDMethods[K] {
     val sc = rasterRDD.sparkContext
     val bcPolygon = sc.broadcast(polygon)
     val bcMetaData = sc.broadcast(rasterRDD.metaData)
-
-    // something that folds shit our RDD is made of into a value
+    
     def seqOp(v: T, t: (K, Tile)): T = {
       val p = bcPolygon.value
       val extent = bcMetaData.value.mapTransform(t.id)
@@ -44,7 +43,7 @@ trait ZonalSummaryRasterRDDMethods[K] extends RasterRDDMethods[K] {
             .map(handleTileIntersection).fold(zeroValue)(combineOp)
         }
 
-      combineOp(v, rs)         // if the tile does not contain an intersection, rs will be a zeroValue
+      combineOp(v, rs)
     }
 
     rasterRDD.aggregate(zeroValue)(seqOp, combineOp)

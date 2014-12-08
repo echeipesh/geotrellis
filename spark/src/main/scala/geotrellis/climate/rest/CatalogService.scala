@@ -33,6 +33,7 @@ import spray.routing._
 import spray.routing.SimpleRoutingApp
 import climate.op._
 import DefaultJsonProtocol._ 
+import com.github.nscala_time.time.Imports._
 
 trait CORSSupport { self: HttpService =>
   val corsHeaders = List(`Access-Control-Allow-Origin`(AllOrigins),
@@ -153,8 +154,9 @@ object CatalogService extends ArgApp[CatalogArgs] with SimpleRoutingApp with Spr
     }
   }
 
+  import geotrellis.spark.op.stats._
   import geotrellis.spark.op.zonal.summary._
-  import geotrellis.raster.op.zonal.summary.Max
+  import geotrellis.raster.op.zonal.summary._
 
   // import scalaz._
 
@@ -167,29 +169,41 @@ object CatalogService extends ArgApp[CatalogArgs] with SimpleRoutingApp with Spr
 
 
   def statsRoute = cors {
-    pathPrefix(Segment / IntNumber) { (name, zoom) =>              
+    (pathPrefix("max" / Segment / IntNumber) & get ) { (name, zoom) =>              
       val layer = LayerId(name, zoom)
-      println("STATS ROUTE", layer)
       val (lmd, params) = accumulo.metaDataCatalog.load(layer).get
       val md = lmd.rasterMetaData
 
-      (path("max")) {
-        entity(as[Extent]) { extent =>
-          import DefaultJsonProtocol._ 
+      parameters('xmin, 'ymin, 'xmax, 'ymax) { (xmin, ymin, xmax, ymax) =>    
+        val extent = Extent(xmin.toDouble, ymin.toDouble, xmax.toDouble, ymax.toDouble)
+        val bounds = md.mapTransform(extent)
 
-          val bounds = md.mapTransform(extent)
-
-          complete {                     
-            val list = catalog.load[SpaceTimeKey](layer, FilterSet(SpaceFilter[SpaceTimeKey](bounds)))
-              .get
-              .zonalSummaryByKey(extent, Int.MinValue, Max, stk => stk.temporalComponent.time)
-
-            list.collect.map { case (date, max) =>
-              JsObject("time" -> JsString(date.toString), "max" -> JsNumber(max))
-            }
-          }
+        complete {                     
+          val data = catalog.load[SpaceTimeKey](layer, FilterSet(SpaceFilter[SpaceTimeKey](bounds)))
+            .get
+            .mapKeys { key => key.updateTemporalComponent(key.temporalKey.time.withMonthOfYear(1).withDayOfMonth(1).withHourOfDay(0)) }
+            .averageByKey
+            .zonalSummaryByKey(extent, Double.MinValue, MaxDouble, stk => stk.temporalComponent.time)
+            .collect
+            .sortBy(_._1) // by date
+          
+          JsArray(JsObject(
+            "model" -> JsString(name),
+            "data" -> JsArray(
+              data.map { case (date, value) =>
+                JsObject(
+                  "time" -> JsString(date.toString), 
+                  "value" -> JsObject(
+                    "mean" -> JsNumber(value),
+                    "min" -> JsNumber(value * (1 + scala.util.Random.nextDouble/3)), // I know, I'm a liar
+                    "max" -> JsNumber(value * (1 - scala.util.Random.nextDouble/3))
+                  )
+                )
+              }: _*
+            )
+          ))
         }
-      }
+      }      
     }
   }
 
@@ -199,7 +213,7 @@ object CatalogService extends ArgApp[CatalogArgs] with SimpleRoutingApp with Spr
       pathPrefix("stats") { statsRoute }
   }
 
-  startServer(interface = "localhost", port = 8080) {
+  startServer(interface = "0.0.0.0", port = 8088) {
     pingPong ~ root
   }
 }

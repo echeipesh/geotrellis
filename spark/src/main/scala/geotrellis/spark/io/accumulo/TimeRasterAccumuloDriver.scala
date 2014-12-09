@@ -27,7 +27,7 @@ object TimeRasterAccumuloDriver extends AccumuloDriver[SpaceTimeKey] {
     new Text(f"${layerId.zoom}%02d_${col}%06d_${row}%06d_${time}")
   }
 
-  val rowIdRx = """(\d+)_(\d+)_(\d+)_(\d+)-(\d+)""".r 
+  val rowIdRx = """(\d+)_(\d+)_(\d+)_(\d+)""".r 
 
   /** Map rdd of indexed tiles to tuples of (table name, row mutation) */
   def encode(layerId: LayerId, raster: RasterRDD[SpaceTimeKey]): RDD[(Text, Mutation)] =
@@ -43,7 +43,7 @@ object TimeRasterAccumuloDriver extends AccumuloDriver[SpaceTimeKey] {
   def decode(rdd: RDD[(Key, Value)], metaData: RasterMetaData): RasterRDD[SpaceTimeKey] = {
     val tileRdd = rdd.map {
       case (key, value) =>
-        val rowIdRx(zoom, col, row, _, _) = key.getRow.toString
+        val rowIdRx(zoom, col, row, _,) = key.getRow.toString
         val spatialKey = SpatialKey(col.toInt, row.toInt)
         val time = DateTime.parse(key.getColumnQualifier.toString)
         val tile = ArrayTile.fromBytes(value.get, metaData.cellType, metaData.tileLayout.tileCols, metaData.tileLayout.tileRows)

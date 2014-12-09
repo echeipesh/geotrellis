@@ -32,7 +32,6 @@ import spray.json._
 import spray.routing._
 import spray.routing.SimpleRoutingApp
 import climate.op._
-import DefaultJsonProtocol._ 
 import com.github.nscala_time.time.Imports._
 
 trait CORSSupport { self: HttpService =>
@@ -174,6 +173,8 @@ object CatalogService extends ArgApp[CatalogArgs] with SimpleRoutingApp with Spr
       val (lmd, params) = accumulo.metaDataCatalog.load(layer).get
       val md = lmd.rasterMetaData
 
+      import DefaultJsonProtocol._ 
+      
       parameters('xmin, 'ymin, 'xmax, 'ymax) { (xmin, ymin, xmax, ymax) =>    
         val extent = Extent(xmin.toDouble, ymin.toDouble, xmax.toDouble, ymax.toDouble)
         val bounds = md.mapTransform(extent)

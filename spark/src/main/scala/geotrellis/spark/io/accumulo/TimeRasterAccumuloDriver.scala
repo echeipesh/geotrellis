@@ -15,7 +15,7 @@ import scala.collection.JavaConversions._
 import scala.collection.mutable
 
 object TimeRasterAccumuloDriver extends AccumuloDriver[SpaceTimeKey] {
-  private val timePrecision = 7
+  private val timePrecision = 4
   def rowId(id: LayerId, key: SpaceTimeKey): String = {
     val SpaceTimeKey(SpatialKey(col, row), TemporalKey(time)) = key
     val timeChunk: String = time.toString.substring(0, timePrecision)    
@@ -33,7 +33,7 @@ object TimeRasterAccumuloDriver extends AccumuloDriver[SpaceTimeKey] {
   def encode(layerId: LayerId, raster: RasterRDD[SpaceTimeKey]): RDD[(Text, Mutation)] =
     raster.map {
       case (SpaceTimeKey(spatialKey, time), tile) =>        
-        val mutation = new Mutation(rowId(layerId, spatialKey.col, spatialKey.row, time.time.toString.substring(0,7)))
+        val mutation = new Mutation(rowId(layerId, spatialKey.col, spatialKey.row, time.time.toString.substring(0,timePrecision)))
         mutation.put(new Text(layerId.name), new Text(time.withZone(DateTimeZone.UTC).toString),
           System.currentTimeMillis(), new Value(tile.toBytes()))
         (null, mutation)
@@ -64,9 +64,9 @@ object TimeRasterAccumuloDriver extends AccumuloDriver[SpaceTimeKey] {
   
   def timeSlugs(filters: List[(DateTime, DateTime)]): List[(String, String)] = filters match {
     case Nil =>
-      List(("0"*4 + "-" + "0"*2) -> ("9"*4 + "-" + "9"*2))
+      List(("0"*4) -> ("9"*4))
     case List((start, end)) =>                 
-      List(start.toString.substring(0,7) -> end.toString.substring(0,7))
+      List(start.toString.substring(0,timePrecision) -> end.toString.substring(0,timePrecision))
   }
 
   def setFilters(job: Job, layerId: LayerId, filterSet: FilterSet[SpaceTimeKey]): Unit = {

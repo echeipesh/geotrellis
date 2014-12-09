@@ -15,6 +15,11 @@ object RasterAccumuloDriver extends AccumuloDriver[SpatialKey] {
   val rowIdRx = """(\d+)_(\d+)_(\d+)""".r // (zoom)_(TmsTilingId)
   def rowId(layerId: LayerId, col: Int, row: Int) = new Text(f"${layerId.zoom}%02d_${col}%06d_${row}%06d")
 
+  def rowId(id: LayerId, key: SpatialKey): String = {
+    val SpatialKey(col, row) = key    
+    f"${id.zoom}%02d_${col}%06d_${row}%06d"
+  }
+
   def encode(layerId: LayerId, raster: RasterRDD[SpatialKey]): RDD[(Text, Mutation)] =
     raster.map { case (key, tile) =>
       val mutation = new Mutation(rowId(layerId, key.col, key.row))
@@ -75,5 +80,17 @@ object RasterAccumuloDriver extends AccumuloDriver[SpatialKey] {
 
     //Set the filter for layer we need
     InputFormatBase.fetchColumns(job, new JPair(new Text(layerId.name), null: Text) :: Nil)
+  }
+
+  def getSplits(id: LayerId, rdd: RasterRDD[SpatialKey], num: Int = 24): Seq[String] = {
+    import org.apache.spark.SparkContext._
+
+    rdd
+      .map( row => rowId(id, row._1) -> null)
+      .sortByKey()
+      .map(_._1)
+      .repartition(num)
+      .mapPartitions{ iter => iter.take(1) }
+      .collect
   }
 }

@@ -12,6 +12,7 @@ import org.apache.spark.rdd.RDD
 import scala.collection.mutable
 import scala.util.{ Failure, Try }
 import scala.collection.JavaConversions._
+import scala.reflect.ClassTag
 
 class TableNotFoundError(table: String) extends Exception(s"Target Accumulo table `$table` does not exist.")
 
@@ -19,7 +20,9 @@ trait AccumuloDriver[K] {
   def encode(layerId: LayerId, raster: RasterRDD[K]): RDD[(Text, Mutation)]
   def decode(rdd: RDD[(Key, Value)], metaData: RasterMetaData): RasterRDD[K]
   def setFilters(job: Job, layerId: LayerId, filters: FilterSet[K])
-
+  def rowId(id: LayerId, key: K): String
+  def getSplits(id: LayerId, rdd: RasterRDD[K], num: Int = 24): Seq[String]
+  
   def load(sc: SparkContext, accumulo: AccumuloInstance)(id: LayerId, metaData: RasterMetaData, table: String, filters: FilterSet[K]): Try[RasterRDD[K]] =
     Try {
       val job = Job.getInstance(sc.hadoopConfiguration)
@@ -41,24 +44,10 @@ trait AccumuloDriver[K] {
       val groups = ops.getLocalityGroups(table)
       val newGroup: java.util.Set[Text] = Set(new Text(layerId.name))
       ops.setLocalityGroups(table, groups.updated(table, newGroup))
+             
 
-      // TODO: this relies on RasterDriver and TimeRasterDrive having the same key row, true for now, not in the future
-      val gridBounds = raster.metaData.mapTransform(raster.metaData.extent)
-      val splitCoords = gridBounds.coords.grouped(12).map { _.head }
-      val fullSplits =
-        (splitCoords.map { splitCoord =>
-          new Text(f"${layerId.zoom}%02d_${splitCoord._1}%06d_${splitCoord._2}%06d")
-        }).toList
-
-      def skip[A](l: List[A], n: Int) =
-        l.zipWithIndex.collect { case (e, i) if ((i + 1) % n) == 0 => e }
-
-      val sk = fullSplits.size / 100
-
-      if (sk > 0) {
-        val splits = skip(fullSplits, sk)
-        accumulo.connector.tableOperations().addSplits(table, new java.util.TreeSet(splits.toSeq))
-      }
+      val splits = getSplits(layerId, raster)
+      accumulo.connector.tableOperations().addSplits(table, new java.util.TreeSet(splits.map(new Text(_))))
 
       val job = Job.getInstance(sc.hadoopConfiguration)
       accumulo.setAccumuloConfig(job)

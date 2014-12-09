@@ -174,7 +174,7 @@ object CatalogService extends ArgApp[CatalogArgs] with SimpleRoutingApp with Spr
       val md = lmd.rasterMetaData
 
       import DefaultJsonProtocol._ 
-      
+
       parameters('xmin, 'ymin, 'xmax, 'ymax) { (xmin, ymin, xmax, ymax) =>    
         val extent = Extent(xmin.toDouble, ymin.toDouble, xmax.toDouble, ymax.toDouble)
         val bounds = md.mapTransform(extent)
@@ -208,10 +208,79 @@ object CatalogService extends ArgApp[CatalogArgs] with SimpleRoutingApp with Spr
     }
   }
 
+  def timedCreate[T](startMsg:String,endMsg:String)(f:() => T):T = {
+    println(startMsg)
+    val s = System.currentTimeMillis
+    val result = f()
+    val e = System.currentTimeMillis
+    val t = "%,d".format(e-s)
+    println(s"\t$endMsg (in $t ms)")
+    result
+  }
+
+  def pixelRoute = cors {
+    import DefaultJsonProtocol._
+    import org.apache.spark.SparkContext._
+
+    path("pixel") {
+      get {
+        parameters('name, 'x.as[Double], 'y.as[Double]) { (name, x, y) =>
+          val layer = LayerId(name, 2)
+          val (lmd, params) = accumulo.metaDataCatalog.load(layer).get
+          val md = lmd.rasterMetaData
+          val crs = md.crs
+
+          val p = Point(x, y).reproject(LatLng, crs)
+          val key = md.mapTransform(p)
+          val rdd = catalog.load[SpaceTimeKey](layer, FilterSet(SpaceFilter[SpaceTimeKey](key.col, key.row))).get
+          val bcMetaData = rdd.sparkContext.broadcast(rdd.metaData)
+
+          def createCombiner(value: Double): (Double, Double) =
+            (value, 1)
+          def mergeValue(acc: (Double, Double), value: Double): (Double, Double) =
+            (acc._1 + value, acc._2 + 1)
+          def mergeCombiners(acc1: (Double, Double), acc2: (Double, Double)): (Double, Double) =
+            (acc1._1 + acc2._1, acc1._2 + acc2._2)
+
+          complete {
+            val data: Array[(DateTime, Double)] =
+            timedCreate("Starting calculation", "End calculation") {
+              rdd
+                .mapKeys { key => key.updateTemporalComponent(key.temporalKey.time.withMonthOfYear(1).withDayOfMonth(1).withHourOfDay(0)) }
+                .map { case (key, tile) =>
+                  val md = bcMetaData.value
+                  val (col, row) = RasterExtent(md.mapTransform(key), tile.cols, tile.rows).mapToGrid(p.x, p.y)
+                  (key, tile.getDouble(col, row))
+                 }
+                .combineByKey(createCombiner, mergeValue, mergeCombiners)
+                .map { case (key, (sum, count)) =>
+                  (key.temporalKey.time, sum / count)
+                 }
+                .collect
+            }
+
+            JsArray(JsObject(
+              "model" -> JsString(name),
+              "data" -> JsArray(
+                data.map { case (year, value) =>
+                  JsObject(
+                    "year" -> JsString(year.toString),
+                    "value" -> JsNumber(value)
+                  )
+                }: _*
+              )
+            ))
+          }
+        }
+      }
+    }
+  }
+
   def root = {
     pathPrefix("catalog") { catalogRoute } ~
       pathPrefix("tms") { tmsRoute } ~
-      pathPrefix("stats") { statsRoute }
+      pathPrefix("stats") { statsRoute } ~
+      pixelRoute
   }
 
   startServer(interface = "0.0.0.0", port = 8088) {

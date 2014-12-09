@@ -15,9 +15,18 @@ import scala.collection.JavaConversions._
 import scala.collection.mutable
 
 object TimeRasterAccumuloDriver extends AccumuloDriver[SpaceTimeKey] {
+  private val timePrecision = 7
+  def rowId(id: LayerId, key: SpaceTimeKey): String = {
+    val SpaceTimeKey(SpatialKey(col, row), TemporalKey(time)) = key
+    val timeChunk: String = time.toString.substring(0, timePrecision)    
+    f"${id.zoom}%02d_${col}%06d_${row}%06d_${time}"
+  }
+
+  //this one is old and busted
   def rowId(layerId: LayerId, col: Int, row: Int, time: String) = {
     new Text(f"${layerId.zoom}%02d_${col}%06d_${row}%06d_${time}")
   }
+
   val rowIdRx = """(\d+)_(\d+)_(\d+)_(\d+)-(\d+)""".r 
 
   /** Map rdd of indexed tiles to tuples of (table name, row mutation) */
@@ -41,14 +50,6 @@ object TimeRasterAccumuloDriver extends AccumuloDriver[SpaceTimeKey] {
         SpaceTimeKey(spatialKey, time) -> tile.asInstanceOf[Tile]
     }
     new RasterRDD(tileRdd, metaData)
-  }
-
-  def setZoomBounds(job: Job, layerId: LayerId): Unit = {
-    val range = new ARange(
-      new Text(f"${layerId.zoom}%02d"),
-      new Text(f"${layerId.zoom+1}%02d")
-    ) :: Nil
-    InputFormatBase.setRanges(job, range)
   }
 
   def tileSlugs(filters: List[GridBounds]): List[(String, String)] = filters match {
@@ -107,8 +108,18 @@ object TimeRasterAccumuloDriver extends AccumuloDriver[SpaceTimeKey] {
 
     InputFormatBase.fetchColumns(job, new APair(new Text(layerId.name), null: Text) :: Nil)
   }
-}
 
-// 02_000000_000001_0000-00
-// 02_000000_000001_2026-06
-// 02_000001_000001_9999-99
+
+  def getSplits(id: LayerId, rdd: RasterRDD[SpaceTimeKey], num: Int = 24): Seq[String] = {
+    import org.apache.spark.SparkContext._
+
+    rdd
+      .map( row => rowId(id, row._1) -> null)
+      .sortByKey()
+      .map(_._1)
+      .repartition(num)
+      .mapPartitions{ iter => iter.take(1) }
+      .collect
+  }
+
+}

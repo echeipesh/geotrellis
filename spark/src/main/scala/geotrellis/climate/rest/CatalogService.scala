@@ -173,7 +173,7 @@ object CatalogService extends ArgApp[CatalogArgs] with SimpleRoutingApp with Spr
   def statsRoute = cors {
     (pathPrefix("max" / Segment / IntNumber) & get ) { (name, zoom) =>              
       val layer = LayerId(name, zoom)
-      val (lmd, params) = accumulo.metaDataCatalog.load(layer).get
+      val (lmd, params) = catalog.metaDataCatalog.load(layer).get
       val md = lmd.rasterMetaData
 
       import DefaultJsonProtocol._ 
@@ -229,7 +229,7 @@ object CatalogService extends ArgApp[CatalogArgs] with SimpleRoutingApp with Spr
       get {
         parameters('name, 'zoom.as[Int], 'x.as[Double], 'y.as[Double]) { (name, zoom, x, y) =>
           val layer = LayerId(name, zoom)
-          val (lmd, params) = accumulo.metaDataCatalog.load(layer).get
+          val (lmd, params) = catalog.metaDataCatalog.load(layer).get
           val md = lmd.rasterMetaData
           val crs = md.crs
 

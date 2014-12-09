@@ -174,7 +174,9 @@ object CatalogService extends ArgApp[CatalogArgs] with SimpleRoutingApp with Spr
     "philadelphia" -> Extent(-75.9284841594,39.5076933259,-74.3543298352,40.5691292481),
     "orlando"      -> Extent(-81.6640927758,28.2876159612,-81.0875104164,28.7973683779),
     "sanjose"      -> Extent(-122.204281443,37.1344012781,-121.5923878102,37.5401705236),
-    "portland"     -> Extent(-123.015276532,45.2704007159,-122.3044835961,45.7602907701)
+    "portland"     -> Extent(-123.015276532,45.2704007159,-122.3044835961,45.7602907701),
+    "usa"          -> Extent(-124.9268976258,25.3021853935,-65.521646682,49.0009765951),
+    "pa"           -> Extent(-80.8936945008,39.7560786402,-74.662271682,42.2519392104)
   )
 
   def statsReponse(model: String, data: Seq[(DateTime, Double)]) =  
@@ -192,7 +194,6 @@ object CatalogService extends ArgApp[CatalogArgs] with SimpleRoutingApp with Spr
           )
         }: _*)
     ))
-  
 
   def statsRoute = cors {
     (pathPrefix(Segment / IntNumber) & get ) { (name, zoom) =>      
@@ -200,6 +201,7 @@ object CatalogService extends ArgApp[CatalogArgs] with SimpleRoutingApp with Spr
       
       val layer = LayerId(name, zoom)
       val (lmd, params) = catalog.metaDataCatalog.load(layer).get
+      println("LOADED", lmd, params)
       val md = lmd.rasterMetaData
 
       parameters('city) { city => 

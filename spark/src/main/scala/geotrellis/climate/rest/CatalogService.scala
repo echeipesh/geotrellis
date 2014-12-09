@@ -57,8 +57,8 @@ object CatalogService extends ArgApp[CatalogArgs] with SimpleRoutingApp with Spr
 
   val accumulo = AccumuloInstance(argHolder.instance, argHolder.zookeeper,
     argHolder.user, new PasswordToken(argHolder.password))
-  //val catalog = accumulo.catalog
-  val catalog: HadoopCatalog = HadoopCatalog(sparkContext, new Path("hdfs://namenode.service.geotrellis-spark.internal:8020/catalog"))
+  val catalog = accumulo.catalog
+  //val catalog: HadoopCatalog = HadoopCatalog(sparkContext, new Path("hdfs://localhost/catalog"))
 
   /** Simple route to test responsiveness of service. */
   val pingPong = path("ping")(complete("pong"))
@@ -125,7 +125,7 @@ object CatalogService extends ArgApp[CatalogArgs] with SimpleRoutingApp with Spr
     } ~ 
     pathPrefix(Segment / IntNumber) { (name, zoom) =>      
       val layer = LayerId(name, zoom)
-      val (lmd, params) = accumulo.metaDataCatalog.load(layer).get
+      val (lmd, params) = catalog.metaDataCatalog.load(layer).get
       val md = lmd.rasterMetaData
       (path("bands") & get) { 
         import DefaultJsonProtocol._
@@ -170,44 +170,67 @@ object CatalogService extends ArgApp[CatalogArgs] with SimpleRoutingApp with Spr
   // }
 
 
+  val extents = Map(
+    "philadelphia" -> Extent(-75.9284841594,39.5076933259,-74.3543298352,40.5691292481),
+    "orlando"      -> Extent(-81.6640927758,28.2876159612,-81.0875104164,28.7973683779),
+    "sanjose"      -> Extent(-122.204281443,37.1344012781,-121.5923878102,37.5401705236),
+    "portland"     -> Extent(-123.015276532,45.2704007159,-122.3044835961,45.7602907701)
+  )
+
+  def statsReponse(model: String, data: Seq[(DateTime, Double)]) =  
+    JsArray(JsObject(
+      "model" -> JsString(model),
+      "data" -> JsArray(
+        data.map { case (date, value) =>
+          JsObject(
+            "time" -> JsString(date.toString), 
+            "value" -> JsObject(
+              "mean" -> JsNumber(value),
+              "min" -> JsNumber(value * (1 + scala.util.Random.nextDouble/3)), // I know, I'm a liar
+              "max" -> JsNumber(value * (1 - scala.util.Random.nextDouble/3))
+            )
+          )
+        }: _*)
+    ))
+  
+
   def statsRoute = cors {
-    (pathPrefix("max" / Segment / IntNumber) & get ) { (name, zoom) =>              
+    (pathPrefix(Segment / IntNumber) & get ) { (name, zoom) =>      
+      import DefaultJsonProtocol._         
+      
       val layer = LayerId(name, zoom)
       val (lmd, params) = catalog.metaDataCatalog.load(layer).get
       val md = lmd.rasterMetaData
 
-      import DefaultJsonProtocol._ 
-
-      parameters('xmin, 'ymin, 'xmax, 'ymax) { (xmin, ymin, xmax, ymax) =>    
-        val extent = Extent(xmin.toDouble, ymin.toDouble, xmax.toDouble, ymax.toDouble)
+      parameters('city) { city => 
+        val extent = extents(city).reproject(LatLng, md.crs)
         val bounds = md.mapTransform(extent)
 
-        complete {                     
-          val data = catalog.load[SpaceTimeKey](layer, FilterSet(SpaceFilter[SpaceTimeKey](bounds)))
-            .get
-            .mapKeys { key => key.updateTemporalComponent(key.temporalKey.time.withMonthOfYear(1).withDayOfMonth(1).withHourOfDay(0)) }
-            .averageByKey
-            .zonalSummaryByKey(extent, Double.MinValue, MaxDouble, stk => stk.temporalComponent.time)
-            .collect
-            .sortBy(_._1) // by date
-          
-          JsArray(JsObject(
-            "model" -> JsString(name),
-            "data" -> JsArray(
-              data.map { case (date, value) =>
-                JsObject(
-                  "time" -> JsString(date.toString), 
-                  "value" -> JsObject(
-                    "mean" -> JsNumber(value),
-                    "min" -> JsNumber(value * (1 + scala.util.Random.nextDouble/3)), // I know, I'm a liar
-                    "max" -> JsNumber(value * (1 - scala.util.Random.nextDouble/3))
-                  )
-                )
-              }: _*
-            )
-          ))
-        }
-      }      
+        path("max") { 
+          complete {    
+            statsReponse(name,
+              catalog.load[SpaceTimeKey](layer, FilterSet(SpaceFilter[SpaceTimeKey](bounds)))
+              .get
+              .mapKeys { key => key.updateTemporalComponent(key.temporalKey.time.withMonthOfYear(1).withDayOfMonth(1).withHourOfDay(0)) }
+              .averageByKey
+              .zonalSummaryByKey(extent, Double.MinValue, MaxDouble, stk => stk.temporalComponent.time)
+              .collect
+              .sortBy(_._1) )
+          } 
+        } ~      
+        path("min") { 
+          complete {    
+            statsReponse(name,
+              catalog.load[SpaceTimeKey](layer, FilterSet(SpaceFilter[SpaceTimeKey](bounds)))
+              .get
+              .mapKeys { key => key.updateTemporalComponent(key.temporalKey.time.withMonthOfYear(1).withDayOfMonth(1).withHourOfDay(0)) }
+              .averageByKey
+              .zonalSummaryByKey(extent, Double.MaxValue, MinDouble, stk => stk.temporalComponent.time)
+              .collect
+              .sortBy(_._1) )
+          } 
+        }    
+      }
     }
   }
 

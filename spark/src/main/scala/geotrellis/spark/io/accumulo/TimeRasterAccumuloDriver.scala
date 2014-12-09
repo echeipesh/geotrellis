@@ -115,9 +115,8 @@ object TimeRasterAccumuloDriver extends AccumuloDriver[SpaceTimeKey] {
 
     rdd
       .map( row => rowId(id, row._1) -> null)
-      .sortByKey()
-      .map(_._1)
-      .repartition(num)
+      .sortByKey(ascending=true, numPartitions = num)
+      .map(_._1)      
       .mapPartitions{ iter => iter.take(1) }
       .collect
   }

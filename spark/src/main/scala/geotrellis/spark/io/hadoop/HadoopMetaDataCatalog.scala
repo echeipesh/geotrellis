@@ -29,7 +29,7 @@ class HadoopMetaDataCatalog(sc: SparkContext, catalogRoot: Path, layerDataDir: L
   def load(layerId: LayerId, subDir: String): Try[LayerMetaData] =
     Try {
       val path = metaDataPath(layerId, subDir)
-
+      println(s"Looking form metadata at: $path")
       val txt = HdfsUtils.getLineScanner(path, sc.hadoopConfiguration) match {
         case Some(in) =>
           try {

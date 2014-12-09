@@ -35,12 +35,3 @@ object AccumuloIngestCommand extends ArgMain[AccumuloIngestArgs] with Logging {
     }
   }
 }
-
-~/spark-1.1.1-bin-cdh4/bin/spark-submit \
---class climate.cmd.AccumuloIngestCommand \
---conf spark.mesos.coarse=true \
---driver-library-path /usr/local/lib spark/target/scala-2.10/geotrellis-spark-assembly-0.10.0-SNAPSHOT.jar \
---crs EPSG:3857 --instance gis --user root --password secret --zookeeper zookeeper.service.geotrellis-spark.internal. \
---input s3n://AKIAJG2PMVWCTRRE4BCQ:5wqgZOYyY3F3FDG1QWND85EpKHKiskAeWPn1927y@ipcc5-models/monthly/tas/miroc5/rcp45/BCSD_0.5deg_tas_Amon_miroc5_rcp45_r1i1p1_200601-210012.nc \
---layerName tas-miroc5-rcp45 \
---table temp

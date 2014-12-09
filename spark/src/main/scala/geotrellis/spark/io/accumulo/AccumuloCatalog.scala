@@ -27,7 +27,7 @@ class AccumuloCatalog(sc: SparkContext, instance: AccumuloInstance,
 
   def save[K: SupportedKey : ClassTag](id: LayerId, table: String, rdd: RasterRDD[K], clobber: Boolean): Try[Unit] = {
     val driver = implicitly[AccumuloDriver[K]]
-    driver.save(sc, instance)(id, rdd, table, clobber)
+    driver.save(sc, instance)(id, rdd, table, clobber).get
 
     val metaData = LayerMetaData(
       rasterMetaData = rdd.metaData,

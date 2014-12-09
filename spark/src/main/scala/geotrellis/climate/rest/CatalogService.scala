@@ -11,6 +11,8 @@ import geotrellis.raster.render._
 import geotrellis.spark._
 import geotrellis.spark.cmd.args._
 import geotrellis.spark.io.accumulo._
+import geotrellis.spark.io.hadoop._
+import org.apache.hadoop.fs.Path
 import geotrellis.spark.json._
 import geotrellis.spark.tiling._
 import geotrellis.spark.utils.SparkUtils
@@ -55,7 +57,8 @@ object CatalogService extends ArgApp[CatalogArgs] with SimpleRoutingApp with Spr
 
   val accumulo = AccumuloInstance(argHolder.instance, argHolder.zookeeper,
     argHolder.user, new PasswordToken(argHolder.password))
-  val catalog = accumulo.catalog
+  //val catalog = accumulo.catalog
+  val catalog: HadoopCatalog = HadoopCatalog(sparkContext, new Path("hdfs://namenode.service.geotrellis-spark.internal:8020/catalog"))
 
   /** Simple route to test responsiveness of service. */
   val pingPong = path("ping")(complete("pong"))

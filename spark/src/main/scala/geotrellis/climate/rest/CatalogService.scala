@@ -224,8 +224,8 @@ object CatalogService extends ArgApp[CatalogArgs] with SimpleRoutingApp with Spr
 
     path("pixel") {
       get {
-        parameters('name, 'x.as[Double], 'y.as[Double]) { (name, x, y) =>
-          val layer = LayerId(name, 2)
+        parameters('name, 'zoom.as[Int], 'x.as[Double], 'y.as[Double]) { (name, zoom, x, y) =>
+          val layer = LayerId(name, zoom)
           val (lmd, params) = accumulo.metaDataCatalog.load(layer).get
           val md = lmd.rasterMetaData
           val crs = md.crs

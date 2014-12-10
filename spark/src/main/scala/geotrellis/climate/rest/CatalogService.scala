@@ -176,7 +176,8 @@ object CatalogService extends ArgApp[CatalogArgs] with SimpleRoutingApp with Spr
     "sanjose"      -> Extent(-122.204281443,37.1344012781,-121.5923878102,37.5401705236),
     "portland"     -> Extent(-123.015276532,45.2704007159,-122.3044835961,45.7602907701),
     "usa"          -> Extent(-124.9268976258,25.3021853935,-65.521646682,49.0009765951),
-    "pa"           -> Extent(-80.8936945008,39.7560786402,-74.662271682,42.2519392104)
+    "pa"           -> Extent(-80.8936945008,39.7560786402,-74.662271682,42.2519392104),
+    "world"        -> Extent(-176.8565908405,-80.2714428203,176.8357981709,83.5687714812)
   )
 
   def statsReponse(model: String, data: Seq[(DateTime, Double)]) =  
@@ -202,12 +203,27 @@ object CatalogService extends ArgApp[CatalogArgs] with SimpleRoutingApp with Spr
       val layer = LayerId(name, zoom)
       val (lmd, params) = catalog.metaDataCatalog.load(layer).get
       println("LOADED", lmd, params)
-      val md = lmd.rasterMetaData
+      val md = lmd.rasterMetaData  
 
       parameters('city) { city => 
         val extent = extents(city).reproject(LatLng, md.crs)
         val bounds = md.mapTransform(extent)
 
+        path("multimodel") {
+          complete {
+            val model1 = catalog.load[SpaceTimeKey](LayerId("tas-miroc5-rcp45",4), FilterSet(SpaceFilter[SpaceTimeKey](bounds))).get
+            val model2 = catalog.load[SpaceTimeKey](LayerId("tas-access1-rcp45",4), FilterSet(SpaceFilter[SpaceTimeKey](bounds))).get
+            val model3 = catalog.load[SpaceTimeKey](LayerId("tas-cm-rcp45",4), FilterSet(SpaceFilter[SpaceTimeKey](bounds))).get
+            val ret = new RasterRDD[SpaceTimeKey](model1.union(model2).union(model3), md)
+              .mapKeys { key => key.updateTemporalComponent(key.temporalKey.time.withMonthOfYear(1).withDayOfMonth(1).withHourOfDay(0)) }
+              .averageByKey
+              .zonalSummaryByKey(extent, Double.MinValue, MaxDouble, stk => stk.temporalComponent.time)
+              .collect
+              .sortBy(_._1)
+
+            statsReponse("miroc5-access1-cm", ret)
+          }
+        } ~
         path("max") { 
           complete {    
             statsReponse(name,

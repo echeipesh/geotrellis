@@ -19,12 +19,7 @@ object TimeRasterAccumuloDriver extends AccumuloDriver[SpaceTimeKey] {
   def rowId(id: LayerId, key: SpaceTimeKey): String = {
     val SpaceTimeKey(SpatialKey(col, row), TemporalKey(time)) = key
     val timeChunk: String = time.toString.substring(0, timePrecision)    
-    f"${id.zoom}%02d_${col}%06d_${row}%06d_${time}"
-  }
-
-  //this one is old and busted
-  def rowId(layerId: LayerId, col: Int, row: Int, time: String) = {
-    new Text(f"${layerId.zoom}%02d_${col}%06d_${row}%06d_${time}")
+    f"${id.zoom}%02d_${col}%06d_${row}%06d_${timeChunk}"
   }
 
   val rowIdRx = """(\d+)_(\d+)_(\d+)_(\d+)""".r 
@@ -32,9 +27,10 @@ object TimeRasterAccumuloDriver extends AccumuloDriver[SpaceTimeKey] {
   /** Map rdd of indexed tiles to tuples of (table name, row mutation) */
   def encode(layerId: LayerId, raster: RasterRDD[SpaceTimeKey]): RDD[(Text, Mutation)] =
     raster.map {
-      case (SpaceTimeKey(spatialKey, time), tile) =>        
-        val mutation = new Mutation(rowId(layerId, spatialKey.col, spatialKey.row, time.time.toString.substring(0,timePrecision)))
-        mutation.put(new Text(layerId.name), new Text(time.withZone(DateTimeZone.UTC).toString),
+      case (key, tile) =>    
+        val time = key.temporalKey.time.withZone(DateTimeZone.UTC).toString
+        val mutation = new Mutation(rowId(layerId, key))
+        mutation.put(new Text(layerId.name), new Text(time),
           System.currentTimeMillis(), new Value(tile.toBytes()))
         (null, mutation)
     }

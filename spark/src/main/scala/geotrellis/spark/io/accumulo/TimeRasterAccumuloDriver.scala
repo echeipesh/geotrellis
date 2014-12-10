@@ -12,17 +12,17 @@ import org.apache.hadoop.mapreduce.Job
 import org.apache.spark.rdd.RDD
 import org.joda.time.{DateTimeZone, DateTime}
 import scala.collection.JavaConversions._
-import scala.collection.mutable
+import scala.util.matching.Regex
 
 object TimeRasterAccumuloDriver extends AccumuloDriver[SpaceTimeKey] {
-  private val timePrecision = 4
+  val rowIdRx = new Regex("""(\d+)_(\d+)_(\d+)_(\d+)""", "zoom", "col", "row", "year")
+
+  def timeChunk(time: DateTime): String = time.toString.substring(0, 4) // grab only the year
+
   def rowId(id: LayerId, key: SpaceTimeKey): String = {
     val SpaceTimeKey(SpatialKey(col, row), TemporalKey(time)) = key
-    val timeChunk: String = time.toString.substring(0, timePrecision)    
-    f"${id.zoom}%02d_${col}%06d_${row}%06d_${timeChunk}"
+    f"${id.zoom}%02d_${col}%06d_${row}%06d_${timeChunk(time)}"
   }
-
-  val rowIdRx = """(\d+)_(\d+)_(\d+)_(\d+)""".r 
 
   /** Map rdd of indexed tiles to tuples of (table name, row mutation) */
   def encode(layerId: LayerId, raster: RasterRDD[SpaceTimeKey]): RDD[(Text, Mutation)] =
@@ -62,7 +62,7 @@ object TimeRasterAccumuloDriver extends AccumuloDriver[SpaceTimeKey] {
     case Nil =>
       List(("0"*4) -> ("9"*4))
     case List((start, end)) =>                 
-      List(start.toString.substring(0,timePrecision) -> end.toString.substring(0,timePrecision))
+      List(timeChunk(start) -> timeChunk(end))
   }
 
   def setFilters(job: Job, layerId: LayerId, filterSet: FilterSet[SpaceTimeKey]): Unit = {
@@ -80,10 +80,9 @@ object TimeRasterAccumuloDriver extends AccumuloDriver[SpaceTimeKey] {
       (tileFrom, tileTo) <- tileSlugs(spaceFilters)
       (timeFrom, timeTo) <- timeSlugs(timeFilters)
     } yield {
-      val from = f"${layerId.zoom}%02d_${tileFrom}_${timeFrom}"
-      val to = f"${layerId.zoom}%02d_${tileTo}_${timeTo}"
-      println("FILTER", from, to)
-      new ARange(from, to)
+      val start = f"${layerId.zoom}%02d_${tileFrom}_${timeFrom}"
+      val end   = f"${layerId.zoom}%02d_${tileTo}_${timeTo}"
+      new ARange(start, end)
     }
 
     InputFormatBase.setRanges(job, ranges)

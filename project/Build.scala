@@ -381,7 +381,7 @@ object GeotrellisBuild extends Build {
           "org.apache.spark" %% "spark-core" % Version.spark % "provided",
           "org.apache.hadoop" % "hadoop-client" % Version.hadoop % "provided",
           "com.quantifind" %% "sumac" % "0.2.3",
-          "org.apache.accumulo" % "accumulo-core" % "1.5.1",
+          "org.apache.accumulo" % "accumulo-core" % "1.5.2",
           spire,
           monocleCore, monocleMacro,
           nscalaTime,

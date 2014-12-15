@@ -22,7 +22,7 @@ trait ZonalSummaryRoutes { self: HttpService with CorsSupport =>
   import GeoJsonSupport._
 
   def zonalRoutes(catalog: AccumuloCatalog) = cors {
-    (pathPrefix(Segment / IntNumber) & (post | options) ) { (name, zoom) =>      
+    (pathPrefix(Segment / IntNumber) & (post) ) { (name, zoom) =>      
       import DefaultJsonProtocol._ 
       import org.apache.spark.SparkContext._        
       
@@ -45,13 +45,23 @@ trait ZonalSummaryRoutes { self: HttpService with CorsSupport =>
               .collect
               .sortBy(_._1) )
           } 
+        } ~          
+        path("max") { 
+          complete {    
+            statsReponse(name,
+              tiles
+              .mapKeys { key => key.updateTemporalComponent(key.temporalKey.time.withMonthOfYear(1).withDayOfMonth(1).withHourOfDay(0)) }
+              .averageByKey
+              .zonalSummaryByKey(polygon, Double.MinValue, MaxDouble, stk => stk.temporalComponent.time)
+              .collect
+              .sortBy(_._1) )
+          } 
         }          
-
-        // val extent = extents(city).reproject(LatLng, md.crs)
-        // val bounds = md.mapTransform(extent)
 
         // path("multimodel") {
         //   complete {
+        //     val extent = extents(city).reproject(LatLng, md.crs)
+        //     val bounds = md.mapTransform(extent)
         //     val model1 = catalog.load[SpaceTimeKey](LayerId("tas-miroc5-rcp45",4), FilterSet(SpaceFilter[SpaceTimeKey](bounds))).get
         //     val model2 = catalog.load[SpaceTimeKey](LayerId("tas-access1-rcp45",4), FilterSet(SpaceFilter[SpaceTimeKey](bounds))).get
         //     val model3 = catalog.load[SpaceTimeKey](LayerId("tas-cm-rcp45",4), FilterSet(SpaceFilter[SpaceTimeKey](bounds))).get
@@ -61,34 +71,9 @@ trait ZonalSummaryRoutes { self: HttpService with CorsSupport =>
         //       .zonalSummaryByKey(extent, Double.MinValue, MaxDouble, stk => stk.temporalComponent.time)
         //       .collect
         //       .sortBy(_._1)
-
         //     statsReponse("miroc5-access1-cm", ret)
         //   }
-        // } ~
-        // path("max") { 
-        //   complete {    
-        //     statsReponse(name,
-        //       catalog.load[SpaceTimeKey](layer, FilterSet(SpaceFilter[SpaceTimeKey](bounds)))
-        //       .get
-        //       .mapKeys { key => key.updateTemporalComponent(key.temporalKey.time.withMonthOfYear(1).withDayOfMonth(1).withHourOfDay(0)) }
-        //       .averageByKey
-        //       .zonalSummaryByKey(extent, Double.MinValue, MaxDouble, stk => stk.temporalComponent.time)
-        //       .collect
-        //       .sortBy(_._1) )
-        //   } 
-        // } ~      
-        // path("min") { 
-        //   complete {    
-        //     statsReponse(name,
-        //       catalog.load[SpaceTimeKey](layer, FilterSet(SpaceFilter[SpaceTimeKey](bounds)))
-        //       .get
-        //       .mapKeys { key => key.updateTemporalComponent(key.temporalKey.time.withMonthOfYear(1).withDayOfMonth(1).withHourOfDay(0)) }
-        //       .averageByKey
-        //       .zonalSummaryByKey(extent, Double.MaxValue, MinDouble, stk => stk.temporalComponent.time)
-        //       .collect
-        //       .sortBy(_._1) )
-        //   } 
-        // }          
+        // } 
       }
     }
   }

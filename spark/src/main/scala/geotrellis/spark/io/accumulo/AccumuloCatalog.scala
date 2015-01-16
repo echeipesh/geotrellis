@@ -7,7 +7,7 @@ import scala.reflect._
 import scala.util.{Failure, Success, Try}
 import geotrellis.spark.op.stats._
 
-class AccumuloCatalog(sc: SparkContext, instance: AccumuloInstance, 
+class AccumuloCatalog(sc: SparkContext, val instance: AccumuloInstance, 
   val metaDataCatalog: AccumuloMetaDataCatalog, 
   val paramsConfig: DefaultParams[String]
 ) extends Catalog {

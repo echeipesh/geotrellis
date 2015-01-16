@@ -388,6 +388,7 @@ object GeotrellisBuild extends Build {
               ExclusionRule(organization = "com.google.code.findbugs")),
           "com.quantifind" %% "sumac" % "0.2.3",
           "org.apache.accumulo" % "accumulo-core" % "1.5.2",
+          "net.chugun" %% "zcurve" % "0.1-SNAPSHOT",
           spire,
           monocleCore, monocleMacro,
           nscalaTime,

@@ -12,7 +12,7 @@ import org.apache.spark.rdd.RDD
 import scala.collection.mutable
 import scala.collection.JavaConversions._
 import scala.reflect.ClassTag
-
+import accumulo.BatchAccumuloInputFormat
 class TableNotFoundError(table: String) extends Exception(s"Target Accumulo table `$table` does not exist.")
 
 trait AccumuloDriver[K] extends Serializable {
@@ -24,9 +24,11 @@ trait AccumuloDriver[K] extends Serializable {
   def load(sc: SparkContext, accumulo: AccumuloInstance)(id: LayerId, metaData: RasterMetaData, table: String, filters: FilterSet[K]): RasterRDD[K] = {
     val job = Job.getInstance(sc.hadoopConfiguration)
     accumulo.setAccumuloConfig(job)
+    
+    
     InputFormatBase.setInputTableName(job, table)
     setFilters(job, id, filters)
-    val rdd = sc.newAPIHadoopRDD(job.getConfiguration, classOf[AccumuloInputFormat], classOf[Key], classOf[Value])
+    val rdd = sc.newAPIHadoopRDD(job.getConfiguration, classOf[BatchAccumuloInputFormat], classOf[Key], classOf[Value])
     decode(rdd, metaData)
   }
 

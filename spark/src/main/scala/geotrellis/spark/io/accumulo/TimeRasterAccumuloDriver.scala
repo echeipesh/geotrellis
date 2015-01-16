@@ -13,15 +13,19 @@ import org.apache.spark.rdd.RDD
 import org.joda.time.{DateTimeZone, DateTime}
 import scala.collection.JavaConversions._
 import scala.util.matching.Regex
+import zcurve._
+
 
 object TimeRasterAccumuloDriver extends AccumuloDriver[SpaceTimeKey] {
-  val rowIdRx = new Regex("""(\d+)_(\d+)_(\d+)_(\d+)""", "zoom", "col", "row", "year")
+  val rowIdRx = new Regex("""(\d+)_(\d+)""", "zoom", "zindex")
 
   def timeChunk(time: DateTime): String = time.toString.substring(0, 4) // grab only the year
 
   def rowId(id: LayerId, key: SpaceTimeKey): String = {
     val SpaceTimeKey(SpatialKey(col, row), TemporalKey(time)) = key
-    f"${id.zoom}%02d_${col}%06d_${row}%06d_${timeChunk(time)}"
+    val t = timeChunk(time).toInt
+    val zindex = Z3(col, row, t)    
+    f"${id.zoom}%02d_${zindex.z}%019d"
   }
 
   /** Map rdd of indexed tiles to tuples of (table name, row mutation) */
@@ -39,8 +43,9 @@ object TimeRasterAccumuloDriver extends AccumuloDriver[SpaceTimeKey] {
   def decode(rdd: RDD[(Key, Value)], metaData: RasterMetaData): RasterRDD[SpaceTimeKey] = {
     val tileRdd = rdd.map {
       case (key, value) =>
-        val rowIdRx(zoom, col, row, _) = key.getRow.toString
-        val spatialKey = SpatialKey(col.toInt, row.toInt)
+        val rowIdRx(zoom, zindex) = key.getRow.toString
+        val Z3(col, row, year) = new Z3(zindex.toLong)
+        val spatialKey = SpatialKey(col, row)
         val time = DateTime.parse(key.getColumnQualifier.toString)
         val tile = ArrayTile.fromBytes(value.get, metaData.cellType, metaData.tileLayout.tileCols, metaData.tileLayout.tileRows)
         SpaceTimeKey(spatialKey, time) -> tile.asInstanceOf[Tile]
@@ -58,11 +63,11 @@ object TimeRasterAccumuloDriver extends AccumuloDriver[SpaceTimeKey] {
       } yield f"${bounds.colMin}%06d_${row}%06d" -> f"${bounds.colMax}%06d_${row}%06d"      
   }
   
-  def timeSlugs(filters: List[(DateTime, DateTime)]): List[(String, String)] = filters match {
+  def timeSlugs(filters: List[(DateTime, DateTime)]): List[(Int, Int)] = filters match {
     case Nil =>
-      List(("0"*4) -> ("9"*4))
+      List(2000 -> 3000)
     case List((start, end)) =>                 
-      List(timeChunk(start) -> timeChunk(end))
+      List(timeChunk(start).toInt -> timeChunk(end).toInt)
   }
 
   def setFilters(job: Job, layerId: LayerId, filterSet: FilterSet[SpaceTimeKey]): Unit = {
@@ -76,18 +81,41 @@ object TimeRasterAccumuloDriver extends AccumuloDriver[SpaceTimeKey] {
         timeFilters = (start, end) :: timeFilters
     }
 
-    val ranges = for {
-      (tileFrom, tileTo) <- tileSlugs(spaceFilters)
-      (timeFrom, timeTo) <- timeSlugs(timeFilters)
-    } yield {
-      val start = f"${layerId.zoom}%02d_${tileFrom}_${timeFrom}"
-      val end   = f"${layerId.zoom}%02d_${tileTo}_${timeTo}"
-      new ARange(start, end)
-    }
+    def timeIndex(dt: DateTime) = timeChunk(dt).toInt
+
+    InputFormatBase.setLogLevel(job, org.apache.log4j.Level.DEBUG)
+    
+    val ranges: Seq[ARange] = (
+      for {
+        bounds <- spaceFilters
+        (timeStart, timeEnd) <- timeSlugs(timeFilters)
+      } yield {
+        val p1 = Z3(bounds.colMin, bounds.rowMin, timeStart)
+        val p2 = Z3(bounds.colMax, bounds.rowMax, timeEnd)
+        
+        val rangeProps = Map(
+          "min" -> p1.z.toString,
+          "max" -> p2.z.toString)
+        
+
+        val ranges = Z3.zranges(p1, p2)
+
+        ranges
+          .map { case (min: Long, max: Long) =>
+
+            val start = f"${layerId.zoom}%02d_${min}%019d"
+            val end   = f"${layerId.zoom}%02d_${max}%019d"
+            println(s"Range: $start - $end")
+            val zmin = new Z3(min)
+            val zmax = new Z3(max)      
+            if (min == max)
+              ARange.exact(start)
+            else
+              new ARange(start, true, end, true)
+          }        
+      }).flatten
 
     InputFormatBase.setRanges(job, ranges)
-
-    assert(timeFilters.length == 0, "Only one TimeFilter supported at this time")
 
     for ( (start, end) <- timeFilters) {
       val props =  Map(
@@ -97,10 +125,11 @@ object TimeRasterAccumuloDriver extends AccumuloDriver[SpaceTimeKey] {
         "endInclusive" -> "true"
       )
 
-      InputFormatBase.addIterator(job, 
-        new IteratorSetting(1, "TimeColumnFilter", "org.apache.accumulo.core.iterators.user.ColumnSliceFilter", props))
+      // InputFormatBase.addIterator(job, 
+      //   new IteratorSetting(2, "TimeColumnFilter", "org.apache.accumulo.core.iterators.user.ColumnSliceFilter", props))
     }
 
     InputFormatBase.fetchColumns(job, new APair(new Text(layerId.name), null: Text) :: Nil)
+
   }
 }

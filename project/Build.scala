@@ -380,15 +380,15 @@ object GeotrellisBuild extends Build {
       ),
       libraryDependencies ++=
         Seq(
-          "org.apache.spark" %% "spark-core" % Version.spark % "provided",
-          "org.apache.hadoop" % "hadoop-client" % Version.hadoop % "provided",
-          "org.apache.spark" %% "spark-graphx" % Version.spark
+          "org.apache.accumulo" % "accumulo-core" % "1.5.2"             
             excludeAll (
-              ExclusionRule(organization = "org.apache.hadoop"),
-              ExclusionRule(organization = "com.google.code.findbugs")),
-          "com.quantifind" %% "sumac" % "0.2.3",
-          "org.apache.accumulo" % "accumulo-core" % "1.5.2",
-          "net.chugun" %% "zcurve" % "0.1-SNAPSHOT",
+              ExclusionRule(organization = "org.apache.hadoop")),
+          "org.apache.spark" %% "spark-graphx" % Version.spark % "provided",
+          "org.apache.spark" %% "spark-core" % Version.spark % "provided",
+          "org.apache.spark" %% "spark-streaming" % Version.spark % "provided",
+          "org.apache.hadoop" % "hadoop-client" % Version.hadoop % "provided",
+          // "com.github.seratch" %% "awscala" % "0.4.+",
+          "com.quantifind" %% "sumac" % "0.2.3",          
           spire,
           monocleCore, monocleMacro,
           nscalaTime,

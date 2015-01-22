@@ -13,7 +13,7 @@ import org.apache.spark.rdd.RDD
 import org.joda.time.{DateTimeZone, DateTime}
 import scala.collection.JavaConversions._
 import scala.util.matching.Regex
-import zcurve._
+import geotrellis.spark.sfc.zcurve._
 
 
 object TimeRasterAccumuloDriver extends AccumuloDriver[SpaceTimeKey] {

@@ -26,6 +26,6 @@ object Version {
   val akka        = "2.2.4"
   val spray       = "1.2.1"
   val jackson     = "1.6.1"
-  lazy val hadoop      = either("SPARK_HADOOP_VERSION", "2.4.1")
-  lazy val spark       = either("SPARK_VERSION", "1.1.0")
+  lazy val hadoop      = either("SPARK_HADOOP_VERSION", "2.5.0")
+  lazy val spark       = either("SPARK_VERSION", "1.2.0")
 }

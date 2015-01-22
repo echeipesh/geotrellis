@@ -28,7 +28,7 @@ object Dependencies {
 
   val scalatest     = "org.scalatest"       %  "scalatest_2.10"  % "2.2.0"
   val scalacheck    = "org.scalacheck"      %% "scalacheck"      % "1.11.1"
-  val scalaReflect  = "org.scala-lang"      %  "scala-reflect"   % "2.10.2"
+  val scalaReflect  = "org.scala-lang"      %  "scala-reflect"   % "2.10.4"
   val sigar         = "org.hyperic"         %  "sigar"           % "1.6.4"
   val jts           = "com.vividsolutions"  %  "jts"             % "1.13"
 

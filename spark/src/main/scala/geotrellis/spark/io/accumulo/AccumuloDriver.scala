@@ -12,7 +12,7 @@ import org.apache.spark.rdd.RDD
 import scala.collection.mutable
 import scala.collection.JavaConversions._
 import scala.reflect.ClassTag
-import accumulo.BatchAccumuloInputFormat
+
 class TableNotFoundError(table: String) extends Exception(s"Target Accumulo table `$table` does not exist.")
 
 trait AccumuloDriver[K] extends Serializable {

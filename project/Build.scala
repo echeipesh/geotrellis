@@ -387,7 +387,7 @@ object GeotrellisBuild extends Build {
           "org.apache.spark" %% "spark-core" % Version.spark % "provided",
           "org.apache.spark" %% "spark-streaming" % Version.spark % "provided",
           "org.apache.hadoop" % "hadoop-client" % Version.hadoop % "provided",
-          // "com.github.seratch" %% "awscala" % "0.4.+",
+          "com.github.seratch" %% "awscala" % "0.4.+",
           "com.quantifind" %% "sumac" % "0.2.3",          
           spire,
           monocleCore, monocleMacro,

@@ -58,7 +58,13 @@ object HdfsUtils extends Logging {
     FileInputFormat.setInputPaths(job, filesAsCsv)
     job.getConfiguration()
   }
-  
+
+  def putFilesInConf(files: Seq[Path], inConf: Configuration): Configuration = {
+    val job = Job.getInstance(inConf)
+    FileInputFormat.setInputPaths(job, files: _*)
+    job.getConfiguration()
+  }
+
   /* get the default block size for that path */
   def defaultBlockSize(path: Path, conf: Configuration): Long =
     path.getFileSystem(conf).getDefaultBlockSize(path)

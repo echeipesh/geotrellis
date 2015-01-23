@@ -1,6 +1,7 @@
 package geotrellis.spark.io.accumulo
 
 import geotrellis.spark._
+import geotrellis.raster._
 import org.apache.accumulo.core.client.BatchWriterConfig
 import org.apache.accumulo.core.client.mapreduce.{ AccumuloOutputFormat, AccumuloInputFormat, InputFormatBase }
 import org.apache.accumulo.core.data.{ Value, Key, Mutation }
@@ -31,6 +32,8 @@ trait AccumuloDriver[K] extends Serializable {
     val rdd = sc.newAPIHadoopRDD(job.getConfiguration, classOf[BatchAccumuloInputFormat], classOf[Key], classOf[Value])
     decode(rdd, metaData)
   }
+
+  def loadTile(accumulo: AccumuloInstance)(id: LayerId, metaData: RasterMetaData, table: String, key: K): Tile
 
   /** NOTE: Accumulo will always perform destructive update, clobber param is not followed */
   def save(sc: SparkContext, accumulo: AccumuloInstance)(layerId: LayerId, raster: RasterRDD[K], table: String, clobber: Boolean): Unit = {

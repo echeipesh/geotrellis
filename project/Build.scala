@@ -394,6 +394,7 @@ object GeotrellisBuild extends Build {
           monocleCore, monocleMacro,
           nscalaTime,
           sprayRouting, sprayCan,
+          logging,
           scalatest % "test"
         ),
       resolvers ++= Seq(

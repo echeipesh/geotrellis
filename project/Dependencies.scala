@@ -26,6 +26,8 @@ object Dependencies {
     "sonatypeSnapshots"       at "http://oss.sonatype.org/content/repositories/snapshots"
   )
 
+  val logging       = "com.typesafe" %% "scalalogging-slf4j" % "1.1.0"
+  
   val scalatest     = "org.scalatest"       %  "scalatest_2.10"  % "2.2.0"
   val scalacheck    = "org.scalacheck"      %% "scalacheck"      % "1.11.1"
   val scalaReflect  = "org.scala-lang"      %  "scala-reflect"   % "2.10.4"

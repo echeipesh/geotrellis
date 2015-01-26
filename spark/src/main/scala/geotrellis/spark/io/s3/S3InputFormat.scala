@@ -48,7 +48,7 @@ abstract class S3InputFormat[K, V] extends InputFormat[K,V] with Logging {
     
     val s3client = new AmazonS3Client(credentials)
     
-    logger.debug("Configuration: bucket=$bucket prefix=$prefix id=${credentials.getAWSAccessKeyId}, key=${credentials.getAWSSecretKey")
+    logger.info(s"Listing Splits: bucket=$bucket prefix=$prefix")
 
     val request = new ListObjectsRequest()
       .withBucketName(bucket)

@@ -21,6 +21,7 @@ import geotrellis.raster.io.geotiff.reader.Tags._
 
 import scala.io._
 import java.nio.{ByteBuffer, ByteOrder}
+import java.io.{InputStream, ByteArrayOutputStream}
 
 class MalformedGeoTiffException(msg: String) extends RuntimeException(msg)
 
@@ -28,6 +29,17 @@ class GeoTiffReaderLimitationException(msg: String)
     extends RuntimeException(msg)
 
 object GeoTiffReader {
+  def read(inStream: InputStream): GeoTiff = {
+    val bufferSize = 0x20000
+    val buffer = new Array[Byte](bufferSize)
+    val outStream = new ByteArrayOutputStream(bufferSize)    
+    var bytes: Int = 0
+    while (bytes != -1) {      
+      bytes = inStream.read(buffer)
+      if (bytes != -1) outStream.write(buffer, 0, bytes);
+    }
+    read(outStream.toByteArray) 
+  }
 
   def read(path: String): GeoTiff = read(Filesystem.slurp(path))
 

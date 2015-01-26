@@ -24,10 +24,7 @@ object NEXIngest extends ArgMain[AccumuloIngestArgs] with Logging {
     System.setProperty("com.sun.media.jai.disableMediaLib", "true")
 
     implicit val sparkContext = SparkUtils.createSparkContext("Ingest")
-    val conf = sparkContext.hadoopConfiguration
-    conf.set("io.map.index.interval", "1")
-
-    //sparkContext.setCheckpointDir("/Users/rob/proj/climate/")
+    val job = sparkContext.newJob
 
     val accumulo = AccumuloInstance(args.instance, args.zookeeper, args.user, new PasswordToken(args.password))
     val layoutScheme = ZoomedLayoutScheme()
@@ -38,11 +35,11 @@ object NEXIngest extends ArgMain[AccumuloIngestArgs] with Logging {
 
     // Get source tiles
     val inPath = args.inPath
-    val updatedConf =
-      sparkContext.hadoopConfiguration.withInputDirectory(inPath)
+    S3InputFormat.setUrl(job, inPath.toUri.toString)
+
     val source = 
       sparkContext.newAPIHadoopRDD(
-        updatedConf,
+        job.getConfiguration,
         classOf[TemporalGeoTiffS3InputFormat],
         classOf[SpaceTimeInputKey],
         classOf[Tile]

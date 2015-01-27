@@ -48,8 +48,8 @@ class TemporalGeoTiffS3InputFormat extends S3InputFormat[SpaceTimeInputKey,Tile]
     new S3RecordReader[SpaceTimeInputKey,Tile] {
       def read(in: InputStream) = {        
         val geoTiff = GeoTiffReader.read(in)
-        val meta = geoTiff.metadata
-        val isoString = meta("ISO_TIME")
+        val meta = geoTiff.metaData
+        val isoString = geoTiff.tags("ISO_TIME")
         val dateTime = DateTime.parse(isoString)
 
         //WARNING: Assuming this is a single band GeoTiff

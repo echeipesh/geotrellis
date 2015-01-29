@@ -75,8 +75,7 @@ object Z2 {
     wiped | (split(p) << dim)
   }  
 
-
-  def zranges(min: Z2, max: Z2): Unit = {
+  def zranges(min: Z2, max: Z2): Seq[(Long, Long)] = {
     val mq = new MergeQueue
     val sr = Z2Range(min, max)
 

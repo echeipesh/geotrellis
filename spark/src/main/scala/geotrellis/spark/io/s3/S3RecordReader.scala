@@ -6,6 +6,8 @@ import com.typesafe.scalalogging.slf4j.Logging
 import java.io.{InputStream, ByteArrayOutputStream}
 import org.apache.hadoop.mapreduce.{InputSplit, TaskAttemptContext, RecordReader}
 
+/** This reader will fetch bytes of each key one at a time using [AmazonS3Client.getObject].
+  * Subclass must extend [read] method to map from S3 object bytes to (K,V) */
 abstract class S3RecordReader[K, V] extends RecordReader[K, V] with Logging {
   var bucket: String = _
   var s3client: AmazonS3Client = _
@@ -21,7 +23,7 @@ abstract class S3RecordReader[K, V] extends RecordReader[K, V] with Logging {
     keys = sp.keys.iterator
     keyCount =  sp.keys.length
     bucket = sp.bucket
-    logger.info(s"Initialize split bucket '$bucket' with $keyCount keys")
+    logger.debug(s"Initialize split on bucket '$bucket' with $keyCount keys")
   }
 
   def getProgress: Float = curCount / keyCount
@@ -30,12 +32,12 @@ abstract class S3RecordReader[K, V] extends RecordReader[K, V] with Logging {
 
   def nextKeyValue(): Boolean = {
     if (keys.hasNext){
-      val key = keys.next
-      logger.info(s"Reading key: $key")
+      val key = keys.next()
+      logger.debug(s"Reading: $key")
       val obj = s3client.getObject(new GetObjectRequest(bucket, key))
       val inStream = obj.getObjectContent
       val objectData = S3RecordReader.readInputStream(inStream)
-      inStream.close
+      inStream.close()
       
       val (k, v) = read(objectData)          
       curKey = k

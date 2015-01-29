@@ -5,6 +5,10 @@ import org.apache.hadoop.io.Writable
 import org.apache.hadoop.mapreduce.InputSplit
 import com.amazonaws.auth.{AWSCredentials, BasicAWSCredentials}
 
+/**
+ * Represents are batch of keys to be read from an S3 bucket.
+ * AWS credentials have already been discovered and provided by the S3InputFormat.
+ */
 class S3InputSplit extends InputSplit with Writable 
 {
   var accessKeyId: String = _

@@ -32,6 +32,11 @@ object TimeRasterAccumuloDriver extends AccumuloDriver[SpaceTimeKey] {
   def timeText(key: SpaceTimeKey): Text = 
     new Text(key.temporalKey.time.withZone(DateTimeZone.UTC).toString)
 
+  def encodePair(layerId: LayerId, row: (SpaceTimeKey, Tile)): (Key, Value) = row match {
+    case (key, tile) =>
+      new Key(rowId(layerId, key), new Text(layerId.name), timeText(key)) -> new Value(tile.toBytes)
+  }
+
   /** Map rdd of indexed tiles to tuples of (table name, row mutation) */
   def encode(layerId: LayerId, raster: RasterRDD[SpaceTimeKey]): RDD[(Text, Mutation)] =
     raster.map {

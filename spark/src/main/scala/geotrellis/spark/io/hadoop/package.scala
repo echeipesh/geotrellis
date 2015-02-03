@@ -4,7 +4,6 @@ import geotrellis.spark._
 import geotrellis.spark.tiling._
 import geotrellis.spark.utils._
 import geotrellis.spark.io.hadoop.formats._
-import geotrellis.spark.io.s3.S3Utils
 
 import geotrellis.raster._
 import geotrellis.vector.Extent
@@ -60,11 +59,7 @@ implicit object SpaceTimeKeyHadoopWritable extends HadoopWritable[SpaceTimeKey] 
     /** Creates a Configuration with all files in a directory (recursively searched)*/
     def withInputDirectory(path: Path): Configuration = {
       //hadoop is just terrible at listing large s3 buckets, we're going to help it out
-      val allFiles =       
-        if (path.toUri.getScheme == "s3n")         
-          S3Utils.listFiles(path)
-        else
-          HdfsUtils.listFiles(path, config)
+      val allFiles = HdfsUtils.listFiles(path, config)
         
       HdfsUtils.putFilesInConf(allFiles, config)
     }

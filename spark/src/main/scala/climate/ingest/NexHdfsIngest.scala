@@ -23,11 +23,9 @@ import com.quantifind.sumac.ArgMain
 import com.github.nscala_time.time.Imports._
 import com.typesafe.scalalogging.slf4j.Logging
 
-class MyIngestArgs extends IngestArgs
-
 /** Ingests the chunked NEX GeoTIFF data */
-object NexHdfsIngest extends ArgMain[MyIngestArgs] with Logging {
-  def main(args: MyIngestArgs): Unit = {
+object NexHdfsIngest extends ArgMain[HadoopIngestArgs] with Logging {
+  def main(args: HadoopIngestArgs): Unit = {
     System.setProperty("com.sun.media.jai.disableMediaLib", "true")
 
     implicit val sparkContext = SparkUtils.createSparkContext("Ingest")
@@ -48,7 +46,7 @@ object NexHdfsIngest extends ArgMain[MyIngestArgs] with Logging {
   
     val save = { (rdd: RasterRDD[SpaceTimeKey], level: LayoutLevel) =>
       val layer = LayerId(args.layerName, level.zoom)
-      val outPath = s"hdfs://ingest/${args.layerName}/${level.zoom}"
+      val outPath = s"${args.catalog}/${args.layerName}/${level.zoom}"
       val encoded = TimeRasterAccumuloDriver.encode(layer, rdd)
       import org.apache.spark.SparkContext._
       encoded.saveAsNewAPIHadoopFile(outPath, classOf[Text], classOf[Mutation], classOf[AccumuloFileOutputFormat], job.getConfiguration)

@@ -23,9 +23,11 @@ import com.quantifind.sumac.ArgMain
 import com.github.nscala_time.time.Imports._
 import com.typesafe.scalalogging.slf4j.Logging
 
+class MyIngestArgs extends IngestArgs
+
 /** Ingests the chunked NEX GeoTIFF data */
-object NexHdfsIngest extends ArgMain[IngestArgs] with Logging {
-  def main(args: IngestArgs): Unit = {
+object NexHdfsIngest extends ArgMain[MyIngestArgs] with Logging {
+  def main(args: MyIngestArgs): Unit = {
     System.setProperty("com.sun.media.jai.disableMediaLib", "true")
 
     implicit val sparkContext = SparkUtils.createSparkContext("Ingest")

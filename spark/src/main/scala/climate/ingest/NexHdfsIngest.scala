@@ -47,7 +47,11 @@ object NexHdfsIngest extends ArgMain[HadoopIngestArgs] with Logging {
     val save = { (rdd: RasterRDD[SpaceTimeKey], level: LayoutLevel) =>
       val layer = LayerId(args.layerName, level.zoom)
       val outPath = s"${args.catalog}/${args.layerName}/${level.zoom}"
-      val encoded = rdd.map { row => TimeRasterAccumuloDriver.encodePair(layer, row) }
+      val encoded = 
+        rdd
+        .map { row => TimeRasterAccumuloDriver.encodePair(layer, row) }
+        .sortBy(_._1)
+        
       import org.apache.spark.SparkContext._
       encoded.saveAsNewAPIHadoopFile(outPath, classOf[Text], classOf[Mutation], classOf[AccumuloFileOutputFormat], job.getConfiguration)
     }

@@ -46,7 +46,8 @@ object TimeRasterAccumuloDriver extends AccumuloDriver[SpaceTimeKey] {
         val mutation = maybeMutation.getOrElse(new Mutation(rowId(layerId, key)))        
         mutation.put(layerId.name, timeText(key), System.currentTimeMillis(), new Value(tile.toBytes()))
         Some(mutation)
-    } 
+    }
+
     val combOp: (Option[Mutation], Option[Mutation]) => Option[Mutation] = { 
       (m1, m2) => (m1, m2) match {
         case (Some(src), Some(dest)) => 
@@ -64,6 +65,7 @@ object TimeRasterAccumuloDriver extends AccumuloDriver[SpaceTimeKey] {
         case (key, tile) =>  (rowId(layerId, key), (key, tile)) 
       } 
       .aggregateByKey(None: Option[Mutation])(seqOp, combOp) 
+      .sortByKey(ascending = true)
       .map{ 
         case (key, mutation) => (null, mutation.get) // null is destination table
       }

@@ -55,11 +55,12 @@ trait AccumuloDriver[K] extends Serializable {
     accumulo.setAccumuloConfig(job)
     AccumuloOutputFormat.setBatchWriterOptions(job, new BatchWriterConfig())
     AccumuloOutputFormat.setDefaultTableName(job, table)
+    val bcConnector = sc.broadcast(connector)
     encode(layerId, raster)
       .foreachPartition { iter =>
         val config = new BatchWriterConfig()
         config.setMaxWriteThreads(12)
-        val writer = connector.createBatchWriter(table, config)
+        val writer = bcConnector.value.createBatchWriter(table, config)
         iter.foreach { case (_, mutation) => writer.addMutation(mutation)}
         writer.close
       }

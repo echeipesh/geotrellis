@@ -13,6 +13,7 @@ import org.apache.spark.rdd.RDD
 import scala.collection.mutable
 import scala.collection.JavaConversions._
 import scala.reflect.ClassTag
+import org.apache.accumulo.core.client.BatchWriter
 
 class TableNotFoundError(table: String) extends Exception(s"Target Accumulo table `$table` does not exist.")
 
@@ -41,21 +42,27 @@ trait AccumuloDriver[K] extends Serializable {
     if (!accumulo.connector.tableOperations().exists(table))
       accumulo.connector.tableOperations().create(table)
 
+    val connector = accumulo.connector
     val ops = accumulo.connector.tableOperations()
     val groups = ops.getLocalityGroups(table)
     val newGroup: java.util.Set[Text] = Set(new Text(layerId.name))
     ops.setLocalityGroups(table, groups.updated(table, newGroup))
     
-
-    val splits = getSplits(layerId, raster)
-    accumulo.connector.tableOperations().addSplits(table, new java.util.TreeSet(splits.map(new Text(_))))
+    // val splits = getSplits(layerId, raster)
+    // accumulo.connector.tableOperations().addSplits(table, new java.util.TreeSet(splits.map(new Text(_))))
 
     val job = Job.getInstance(sc.hadoopConfiguration)
     accumulo.setAccumuloConfig(job)
     AccumuloOutputFormat.setBatchWriterOptions(job, new BatchWriterConfig())
     AccumuloOutputFormat.setDefaultTableName(job, table)
     encode(layerId, raster)
-      .saveAsNewAPIHadoopFile(accumulo.instanceName, classOf[Text], classOf[Mutation], classOf[AccumuloOutputFormat], job.getConfiguration)
+      .foreachPartition { iter =>
+        val config = new BatchWriterConfig()
+        config.setMaxWriteThreads(12)
+        val writer = connector.createBatchWriter(table, config)
+        iter.foreach { case (_, mutation) => writer.addMutation(mutation)}
+        writer.close
+      }
   }
 
  def getSplits(id: LayerId, rdd: RasterRDD[K], num: Int = 24): Seq[String] = {

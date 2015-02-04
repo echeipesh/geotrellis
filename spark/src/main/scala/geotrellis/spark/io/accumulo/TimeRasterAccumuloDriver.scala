@@ -40,35 +40,14 @@ object TimeRasterAccumuloDriver extends AccumuloDriver[SpaceTimeKey] {
 
   /** Map rdd of indexed tiles to tuples of (table name, row mutation) */
   def encode(layerId: LayerId, raster: RasterRDD[SpaceTimeKey]): RDD[(Text, Mutation)] = {
-    val seqOp: (Option[Mutation], (SpaceTimeKey, Tile)) => Option[Mutation] = { 
-      (maybeMutation, row) => 
-        val (key, tile) = row
-        val mutation = maybeMutation.getOrElse(new Mutation(rowId(layerId, key)))        
-        mutation.put(layerId.name, timeText(key), System.currentTimeMillis(), new Value(tile.toBytes()))
-        Some(mutation)
-    }
-
-    val combOp: (Option[Mutation], Option[Mutation]) => Option[Mutation] = { 
-      (m1, m2) => (m1, m2) match {
-        case (Some(src), Some(dest)) => 
-          src.getUpdates foreach { update =>           
-            dest.put(new Text(update.getColumnFamily), new Text(update.getColumnQualifier), new Value(update.getValue))
-          }
-          Some(dest)
-        case (om, None) => om
-        case (None, om) => om
-      }
-    }
 
     raster      
       .map { 
-        case (key, tile) =>  (rowId(layerId, key), (key, tile)) 
-      } 
-      .aggregateByKey(None: Option[Mutation])(seqOp, combOp) 
-      .sortByKey(ascending = true)
-      .map{ 
-        case (key, mutation) => (null, mutation.get) // null is destination table
-      }
+        case (key, tile) =>  
+        val mutation = new Mutation(rowId(layerId, key))        
+        mutation.put(layerId.name, timeText(key), System.currentTimeMillis(), new Value(tile.toBytes()))
+        (null, mutation)
+      }       
     }
 
   /** Maps RDD of Accumulo specific Key, Value pairs to a tuple of (K, Tile) and wraps it in RasterRDD */

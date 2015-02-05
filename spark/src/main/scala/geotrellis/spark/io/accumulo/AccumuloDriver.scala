@@ -16,6 +16,7 @@ import scala.reflect.ClassTag
 import org.apache.accumulo.core.client.BatchWriter
 import org.apache.hadoop.fs.Path
 import geotrellis.spark.io.hadoop.HdfsUtils
+import org.apache.accumulo.core.util.CachedConfiguration
 
 
 class TableNotFoundError(table: String) extends Exception(s"Target Accumulo table `$table` does not exist.")
@@ -65,6 +66,10 @@ trait AccumuloDriver[K] extends Serializable {
       .saveAsNewAPIHadoopFile(outPathString, classOf[Key], classOf[Value], classOf[AccumuloFileOutputFormat], job.getConfiguration)
 
     val failuresPath = outPath.suffix("-failures")
+    HdfsUtils.ensurePathExists(failuresPath, conf)
+
+    //this is required or accumulo code will not be able to read hdfs
+    CachedConfiguration.setInstance(conf)
     ops.importDirectory(table, outPathString, failuresPath.toString, true)
 
     HdfsUtils.deletePath(outPath, conf)

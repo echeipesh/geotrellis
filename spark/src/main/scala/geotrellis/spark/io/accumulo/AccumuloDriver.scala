@@ -55,17 +55,20 @@ trait AccumuloDriver[K] extends Serializable {
     val job = Job.getInstance(sc.hadoopConfiguration)
     val conf = job.getConfiguration
 
-    val basePath = new Path("hdfs://localhost/accumulo/ingest")
+    val basePath = new Path("hdfs://localhost/accumulo/ingest/")
     val outPath = HdfsUtils.tmpPath(basePath, s"${id.name}-${id.zoom}", conf)    
     val outPathString = outPath.toString
 
     raster
       .map { case (key, tile) => getKey(id, key) -> new Value(tile.toBytes) }
-      .saveAsNewAPIHadoopFile(outPathString, classOf[Key], classOf[Value], classOf[AccumuloFileOutputFormat])
+      .sortByKey(ascending = true)
+      .saveAsNewAPIHadoopFile(outPathString, classOf[Key], classOf[Value], classOf[AccumuloFileOutputFormat], job.getConfiguration)
 
-    ops.importTable(table, outPathString)
+    val failuresPath = outPath.suffix("-failures")
+    ops.importDirectory(table, outPathString, failuresPath.toString, true)
 
     HdfsUtils.deletePath(outPath, conf)
+    HdfsUtils.deletePath(failuresPath, conf)
   }
 
  def getSplits(id: LayerId, rdd: RasterRDD[K], num: Int = 24): Seq[String] = {

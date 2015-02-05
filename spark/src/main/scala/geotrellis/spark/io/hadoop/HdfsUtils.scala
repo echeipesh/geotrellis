@@ -145,7 +145,6 @@ object HdfsUtils extends Logging {
     do {
       path = base.suffix(s"$prefix-${createRandomString(20)}")
     } while ( fs.exists(path) )
-    ensurePathExists(path, conf)
     path
   }
 

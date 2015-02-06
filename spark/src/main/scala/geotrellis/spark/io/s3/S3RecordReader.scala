@@ -23,7 +23,7 @@ abstract class S3RecordReader[K, V] extends RecordReader[K, V] with Logging {
     keys = sp.keys.iterator
     keyCount =  sp.keys.length
     bucket = sp.bucket
-    logger.debug(s"Initialize split on bucket '$bucket' with $keyCount keys")
+    logger.debug(s"Initialize split on bucket '$bucket' with $keyCount keys")  
   }
 
   def getProgress: Float = curCount / keyCount

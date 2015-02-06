@@ -1,21 +1,11 @@
 package geotrellis.spark.io.accumulo
 
 import org.apache.accumulo.core.client._
-import org.apache.accumulo.core.client.impl.{Tables, TabletLocator}
-import org.apache.accumulo.core.client.mapreduce.lib.util.{InputConfigurator => IC, ConfiguratorBase => CB}
-import org.apache.accumulo.core.client.mapreduce.{InputFormatBase, AccumuloInputFormat}
-import org.apache.accumulo.core.client.mock.MockInstance
-import org.apache.accumulo.core.client.security.tokens.AuthenticationToken
-import org.apache.accumulo.core.data.{Range => ARange, _}
-import org.apache.accumulo.core.master.state.tables.TableState
-import org.apache.accumulo.core.security.thrift.TCredentials
-import org.apache.accumulo.core.security.{CredentialHelper, Authorizations}
-import org.apache.accumulo.core.util.UtilWaitThread
-import org.apache.hadoop.io.Text
-import org.apache.hadoop.mapreduce.{RecordReader, TaskAttemptContext, InputSplit, JobContext}
-import org.apache.log4j.Level
-import scala.collection.JavaConversions._
 
+import org.apache.accumulo.core.data._
+import org.apache.accumulo.core.security.Authorizations
+import org.apache.hadoop.mapreduce.{RecordReader, TaskAttemptContext, InputSplit}
+import scala.collection.JavaConverters._
 
 /**
  * It is not clear what would be better, a series of scanners or a BatchScanner.
@@ -27,17 +17,25 @@ class MultiRangeRecordReader extends RecordReader[Key, Value] {
   var key: Key = null
   var value: Value = null
 
-  def initialize(split: InputSplit, context: TaskAttemptContext): Unit = {
+  def initialize(inputSplit: InputSplit, context: TaskAttemptContext): Unit = {    
+    val split = inputSplit.asInstanceOf[MultiRangeInputSplit]
+    
     val queryThreads = 1
-    val sp = split.asInstanceOf[MultiRangeInputSplit]
-    val connector = sp.connector
-    scanner = connector.createBatchScanner(sp.table, new Authorizations(), queryThreads)
-    scanner.setRanges(sp.ranges)
-    iterator = scanner.iterator()
+    val connector = split.connector
+    scanner = connector.createBatchScanner(split.table, new Authorizations(), queryThreads);
+    scanner.setRanges(split.ranges.asJava)        
+    split.iterators foreach { scanner.addScanIterator }
+    split.fetchedColumns foreach { pair =>  
+      if (pair.getSecond != null)
+        scanner.fetchColumn(pair.getFirst, pair.getSecond) 
+      else 
+        scanner.fetchColumnFamily(pair.getFirst)
+    }
+    iterator = scanner.iterator().asScala
   }
 
-  def getProgress: Float = ???
-
+  def getProgress: Float = 0 //not sure how this is used
+  
   def nextKeyValue(): Boolean = {
     val hasNext = iterator.hasNext
     if (hasNext) {

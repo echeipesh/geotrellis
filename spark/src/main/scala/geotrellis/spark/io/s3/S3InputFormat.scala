@@ -24,6 +24,7 @@ abstract class S3InputFormat[K, V] extends InputFormat[K,V] with Logging {
     import scala.collection.JavaConversions._
 
     val conf = context.getConfiguration
+    val anon = conf.get(ANONYMOUS)
     val id = conf.get(AWS_ID)
     val key = conf.get(AWS_KEY)
     val bucket = conf.get(BUCKET)
@@ -34,14 +35,17 @@ abstract class S3InputFormat[K, V] extends InputFormat[K,V] with Logging {
     }
 
     val credentials = 
-      if (id != null && key != null)
+      if (anon != null)
+        new AnonymousAWSCredentials()
+      else if (id != null && key != null)
         new BasicAWSCredentials(id, key)
       else      
         new DefaultAWSCredentialsProviderChain().getCredentials
     
     val s3client = new AmazonS3Client(credentials)
     
-    logger.info(s"Listing Splits: bucket=$bucket prefix=$prefix maxKeys=$maxKeys")
+    logger.info(s"Listing Splits: bucket=$bucket prefix=$prefix")
+    logger.debug(s"Authenticationg with ID=${credentials.getAWSAccessKeyId}")
 
     val request = new ListObjectsRequest()
       .withBucketName(bucket)
@@ -56,7 +60,12 @@ abstract class S3InputFormat[K, V] extends InputFormat[K,V] with Logging {
       split.accessKeyId = credentials.getAWSAccessKeyId
       split.secretKey = credentials.getAWSSecretKey
       split.bucket = bucket
+<<<<<<< HEAD
       split.keys = listing.getObjectSummaries.map(_.getKey)
+=======
+      // avoid including "directories" in the input split, can cause 403 errors on GET
+      split.keys = listing.getObjectSummaries.map(_.getKey).filterNot(_ endsWith "/")
+>>>>>>> master
     
       splits = split :: splits
       request.setMarker(listing.getNextMarker)
@@ -67,6 +76,7 @@ abstract class S3InputFormat[K, V] extends InputFormat[K,V] with Logging {
 }
 
 object S3InputFormat {
+  final val ANONYMOUS = "s3.anonymous"
   final val AWS_ID = "s3.awsId"
   final val AWS_KEY = "s3.awsKey"
   final val BUCKET = "s3.bucket"
@@ -95,5 +105,11 @@ object S3InputFormat {
   def setMaxKeys(job: Job, limit: Int) = {
     val conf = job.getConfiguration
     conf.set(MAX_KEYS, limit.toString)
+  }
+
+  /** Force anonymous access, bypass all key discovery */
+  def setAnonymous(job: Job) = {
+    val conf = job.getConfiguration
+    conf.set(ANONYMOUS, "true")
   }
 }

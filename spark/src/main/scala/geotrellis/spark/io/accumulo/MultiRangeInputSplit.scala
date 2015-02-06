@@ -3,21 +3,19 @@ package geotrellis.spark.io.accumulo
 import java.io.{IOException, DataOutput, DataInput}
 import java.nio.charset.Charset
 import org.apache.accumulo.core.client._
-import org.apache.accumulo.core.client.impl.{Tables, TabletLocator}
-import org.apache.accumulo.core.client.mapreduce.lib.util.{InputConfigurator => IC, ConfiguratorBase => CB}
-import org.apache.accumulo.core.client.mapreduce.{InputFormatBase, AccumuloInputFormat}
+
+import org.apache.accumulo.core.client.mapreduce.lib.util.{InputConfigurator => IC}
 import org.apache.accumulo.core.client.mock.MockInstance
 import org.apache.accumulo.core.client.security.tokens.AuthenticationToken
-import org.apache.accumulo.core.data.{Range => ARange, _}
-import org.apache.accumulo.core.master.state.tables.TableState
-import org.apache.accumulo.core.security.thrift.TCredentials
+import org.apache.accumulo.core.data.{Range => ARange}
 import org.apache.accumulo.core.security.{CredentialHelper, Authorizations}
-import org.apache.accumulo.core.util.{Pair => APair, UtilWaitThread}
+import org.apache.accumulo.core.util.{Pair => APair}
 import org.apache.commons.codec.binary.Base64
 import org.apache.hadoop.io.{Writable, Text}
-import org.apache.hadoop.mapreduce.{RecordReader, TaskAttemptContext, InputSplit, JobContext}
+import org.apache.hadoop.mapreduce.InputSplit
 import org.apache.log4j.Level
-import scala.collection.JavaConversions._
+import scala.collection.mutable
+import scala.collection.JavaConverters._
 
 class MultiRangeInputSplit extends InputSplit with Writable {
   var ranges: Seq[ARange] = null
@@ -27,17 +25,19 @@ class MultiRangeInputSplit extends InputSplit with Writable {
   var zooKeepers: String = null
   var principal: String = null
   var token: AuthenticationToken = null
-  var fetchedColumns: java.util.Set[APair[Text, Text]] = null
-
-  val offline: Boolean = false
-  var mockInstance: Boolean = false
-  val isolatedScan: Boolean = false
-  var localIterators: Boolean = false
+  var fetchedColumns: mutable.Set[APair[Text, Text]] = mutable.Set.empty
   var auths: Authorizations = null
-  var iterators: List[IteratorSetting] = Nil
-  var level: Level = Level.DEBUG
+  var iterators: List[IteratorSetting] = Nil  
+  
+  var mockInstance: Boolean = false
+  var level: Level = Level.INFO
 
-  def instance = new ZooKeeperInstance(instanceName, zooKeepers)
+  
+  def instance = 
+    if (mockInstance)
+      new MockInstance(instanceName)
+    else
+      new ZooKeeperInstance(instanceName, zooKeepers)
 
   def connector = instance.getConnector(principal, token)
 
@@ -56,17 +56,10 @@ class MultiRangeInputSplit extends InputSplit with Writable {
       out.writeUTF(table)
     }
     out.writeUTF(location)
-    out.writeBoolean(localIterators)
-    if (localIterators) {
-      out.writeBoolean(localIterators)
-    }
     out.writeBoolean(mockInstance)
-    if (mockInstance) {
-      out.writeBoolean(mockInstance)
-    }
     out.writeBoolean(null != fetchedColumns)
     if (null != fetchedColumns) {
-      val cols: Array[String] = IC.serializeColumns(fetchedColumns)
+      val cols: Array[String] = IC.serializeColumns(fetchedColumns.asJava)
       out.writeInt(cols.length)
       for (col <- cols) {
         out.writeUTF(col)
@@ -103,7 +96,6 @@ class MultiRangeInputSplit extends InputSplit with Writable {
     out.writeBoolean(null != iterators)
     if (null != iterators) {
       out.writeInt(iterators.size)
-      import scala.collection.JavaConversions._
       for (iterator <- iterators) {
         iterator.write(out)
       }
@@ -125,22 +117,15 @@ class MultiRangeInputSplit extends InputSplit with Writable {
       table = in.readUTF()
     }    
     location = in.readUTF()
-
-    if (in.readBoolean()) {
-      localIterators = in.readBoolean()
-    }
-
-    if (in.readBoolean()) {
-      mockInstance = in.readBoolean()
-    }
-
+    mockInstance = in.readBoolean()
+    
     if (in.readBoolean()) {
       val numColumns = in.readInt()
-      var columns: List[String] = Nil
+      var columns: java.util.List[String] = new java.util.ArrayList()
       for (i <- 0 until numColumns) {
-        columns = in.readUTF() :: columns
+        columns.add(in.readUTF())
       }
-      fetchedColumns = IC.deserializeFetchedColumns(columns)
+      fetchedColumns = IC.deserializeFetchedColumns(columns).asScala
     }
 
     if (in.readBoolean()) {

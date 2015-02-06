@@ -390,6 +390,7 @@ object GeotrellisBuild extends Build {
           "com.github.seratch" %% "awscala" % "0.4.+",
           "com.quantifind" %% "sumac" % "0.2.3",          
           "de.javakaffee" % "kryo-serializers" % "0.27",
+          logging, awsSdkS3,
           spire,
           monocleCore, monocleMacro,
           nscalaTime,

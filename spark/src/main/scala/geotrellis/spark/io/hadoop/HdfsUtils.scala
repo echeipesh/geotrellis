@@ -58,7 +58,13 @@ object HdfsUtils extends Logging {
     FileInputFormat.setInputPaths(job, filesAsCsv)
     job.getConfiguration()
   }
-  
+
+  def putFilesInConf(files: Seq[Path], inConf: Configuration): Configuration = {
+    val job = Job.getInstance(inConf)
+    FileInputFormat.setInputPaths(job, files: _*)
+    job.getConfiguration()
+  }
+
   /* get the default block size for that path */
   def defaultBlockSize(path: Path, conf: Configuration): Long =
     path.getFileSystem(conf).getDefaultBlockSize(path)
@@ -132,6 +138,15 @@ object HdfsUtils extends Logging {
     }
 
   def createRandomString(size: Int): String = Random.alphanumeric.take(size).mkString
+
+  def tmpPath(base: Path, prefix: String, conf: Configuration) = {
+    val fs = base.getFileSystem(conf)
+    var path: Path = null
+    do {
+      path = base.suffix(s"$prefix-${createRandomString(20)}")
+    } while ( fs.exists(path) )
+    path
+  }
 
   def getLineScanner(path: String, conf: Configuration): Option[LineScanner] =
     getLineScanner(new Path(path), conf)

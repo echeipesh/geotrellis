@@ -20,6 +20,8 @@ object RasterAccumuloDriver extends AccumuloDriver[SpatialKey] {
     val SpatialKey(col, row) = key    
     f"${id.zoom}%02d_${col}%06d_${row}%06d"
   }
+  
+  def getKey(id: LayerId, key: SpatialKey) = ??? 
 
   def encode(layerId: LayerId, raster: RasterRDD[SpatialKey]): RDD[(Text, Mutation)] =
     raster.map { case (key, tile) =>

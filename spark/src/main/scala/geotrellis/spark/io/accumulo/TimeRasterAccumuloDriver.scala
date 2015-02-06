@@ -27,6 +27,9 @@ object TimeRasterAccumuloDriver extends AccumuloDriver[SpaceTimeKey] {
     f"${id.zoom}%02d_${col}%06d_${row}%06d_${timeChunk(time)}"
   }
 
+  def getKey(id: LayerId, key: SpaceTimeKey) = 
+    new Key(rowId(id, key), new Text(id.name), timeText(key))
+
   def timeText(key: SpaceTimeKey): Text = 
     new Text(key.temporalKey.time.withZone(DateTimeZone.UTC).toString)
 

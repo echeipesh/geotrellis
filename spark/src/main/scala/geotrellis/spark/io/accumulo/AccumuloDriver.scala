@@ -3,7 +3,7 @@ package geotrellis.spark.io.accumulo
 import geotrellis.spark._
 import geotrellis.raster._
 import org.apache.accumulo.core.client.BatchWriterConfig
-import org.apache.accumulo.core.client.mapreduce.{ AccumuloOutputFormat, AccumuloInputFormat, InputFormatBase }
+import org.apache.accumulo.core.client.mapreduce.{ AccumuloFileOutputFormat, AccumuloOutputFormat, AccumuloInputFormat, InputFormatBase }
 import org.apache.accumulo.core.data.{ Value, Key, Mutation }
 import org.apache.hadoop.io.Text
 import org.apache.hadoop.mapreduce.Job
@@ -13,6 +13,9 @@ import org.apache.spark.rdd.RDD
 import scala.collection.mutable
 import scala.collection.JavaConversions._
 import scala.reflect.ClassTag
+import org.apache.hadoop.fs.Path
+import geotrellis.spark.io.hadoop.HdfsUtils
+import org.apache.accumulo.core.util.CachedConfiguration
 
 class TableNotFoundError(table: String) extends Exception(s"Target Accumulo table `$table` does not exist.")
 
@@ -21,7 +24,8 @@ trait AccumuloDriver[K] extends Serializable {
   def decode(rdd: RDD[(Key, Value)], metaData: RasterMetaData): RasterRDD[K]
   def setFilters(job: Job, layerId: LayerId, filters: FilterSet[K])
   def rowId(id: LayerId, key: K): String
-  
+  def getKey(id: LayerId, key: K) 
+    
   def load(sc: SparkContext, accumulo: AccumuloInstance)(id: LayerId, metaData: RasterMetaData, table: String, filters: FilterSet[K]): RasterRDD[K] = {
     val job = Job.getInstance(sc.hadoopConfiguration)
     accumulo.setAccumuloConfig(job)
@@ -34,26 +38,37 @@ trait AccumuloDriver[K] extends Serializable {
   def loadTile(accumulo: AccumuloInstance)(id: LayerId, metaData: RasterMetaData, table: String, key: K): Tile
 
   /** NOTE: Accumulo will always perform destructive update, clobber param is not followed */
-  def save(sc: SparkContext, accumulo: AccumuloInstance)(layerId: LayerId, raster: RasterRDD[K], table: String, clobber: Boolean): Unit = {
-    // Create table if it doesn't exist.
-    if (!accumulo.connector.tableOperations().exists(table))
-      accumulo.connector.tableOperations().create(table)
-
-    val ops = accumulo.connector.tableOperations()
+  def save(sc: SparkContext, accumulo: AccumuloInstance)(id: LayerId, raster: RasterRDD[K], table: String, clobber: Boolean): Unit = {
+    val connector = accumulo.connector
+    val ops = connector.tableOperations()
     val groups = ops.getLocalityGroups(table)
-    val newGroup: java.util.Set[Text] = Set(new Text(layerId.name))
+
+    if (! ops.exists(table)) 
+      ops.create(table)
+    val newGroup: java.util.Set[Text] = Set(new Text(id.name))
     ops.setLocalityGroups(table, groups.updated(table, newGroup))
     
-
-    val splits = getSplits(layerId, raster)
-    accumulo.connector.tableOperations().addSplits(table, new java.util.TreeSet(splits.map(new Text(_))))
-
     val job = Job.getInstance(sc.hadoopConfiguration)
-    accumulo.setAccumuloConfig(job)
-    AccumuloOutputFormat.setBatchWriterOptions(job, new BatchWriterConfig())
-    AccumuloOutputFormat.setDefaultTableName(job, table)
-    encode(layerId, raster)
-      .saveAsNewAPIHadoopFile(accumulo.instanceName, classOf[Text], classOf[Mutation], classOf[AccumuloOutputFormat], job.getConfiguration)
+    val conf = job.getConfiguration
+
+    val basePath = new Path("hdfs://localhost/accumulo/ingest/")
+    val outPath = HdfsUtils.tmpPath(basePath, s"${id.name}-${id.zoom}", conf)    
+    val outPathString = outPath.toString
+
+    raster
+      .map { case (key, tile) => getKey(id, key) -> new Value(tile.toBytes) }
+      .sortByKey(ascending = true)
+      .saveAsNewAPIHadoopFile(outPathString, classOf[Key], classOf[Value], classOf[AccumuloFileOutputFormat], job.getConfiguration)
+
+    val failuresPath = outPath.suffix("-failures")
+    HdfsUtils.ensurePathExists(failuresPath, conf)
+
+    //this is required or accumulo code will not be able to read hdfs
+    CachedConfiguration.setInstance(conf)
+    ops.importDirectory(table, outPathString, failuresPath.toString, true)
+
+    HdfsUtils.deletePath(outPath, conf)
+    HdfsUtils.deletePath(failuresPath, conf)
   }
 
  def getSplits(id: LayerId, rdd: RasterRDD[K], num: Int = 24): Seq[String] = {

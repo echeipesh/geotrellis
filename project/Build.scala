@@ -366,7 +366,7 @@ object GeotrellisBuild extends Build {
   lazy val spark: Project =
     Project("spark", file("spark"))
       .settings(sparkSettings: _*)
-      .dependsOn(raster, gdal)
+      .dependsOn(raster, gdal, index)
 
   lazy val sparkSettings =
     Seq(
@@ -379,7 +379,8 @@ object GeotrellisBuild extends Build {
         "-Dsun.io.serialization.extendedDebugInfo=true"
       ),
       libraryDependencies ++=
-        Seq(        
+        Seq( 
+          awsSdkS3,
           "org.apache.accumulo" % "accumulo-core" % "1.5.2"             
             excludeAll (
               ExclusionRule(organization = "org.apache.hadoop")),  
@@ -388,7 +389,7 @@ object GeotrellisBuild extends Build {
           "org.apache.spark" %% "spark-graphx" % Version.spark % "provided",
           "com.quantifind" %% "sumac" % "0.2.3",          
           "de.javakaffee" % "kryo-serializers" % "0.27",
-          logging, awsSdkS3,
+          logging,
           spire,
           monocleCore, monocleMacro,
           nscalaTime,

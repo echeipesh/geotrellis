@@ -60,9 +60,9 @@ trait AccumuloDriver[K] extends Serializable {
     val failuresPath = outPath.suffix("-failures")
     
     try {
-      raster        
+      raster                
+        .sortBy{ case (key, _) => rowId(id, key) }
         .map { case (key, tile) => getKey(id, key) -> new Value(tile.toBytes) }        
-        .sortByKey(ascending = true)
         .saveAsNewAPIHadoopFile(outPath.toString, classOf[Key], classOf[Value], classOf[AccumuloFileOutputFormat], job.getConfiguration)
 
       HdfsUtils.ensurePathExists(failuresPath, conf)

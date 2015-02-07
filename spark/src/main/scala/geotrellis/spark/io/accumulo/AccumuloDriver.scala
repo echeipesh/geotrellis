@@ -61,7 +61,7 @@ trait AccumuloDriver[K] extends Serializable {
     
     try {
       raster                
-        .sortBy{ case (key, _) => rowId(id, key) }
+        .sortBy{ case (key, _) => getKey(id, key) }
         .map { case (key, tile) => getKey(id, key) -> new Value(tile.toBytes) }        
         .saveAsNewAPIHadoopFile(outPath.toString, classOf[Key], classOf[Value], classOf[AccumuloFileOutputFormat], job.getConfiguration)
 

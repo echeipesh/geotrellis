@@ -16,6 +16,7 @@ import scala.reflect.ClassTag
 import org.apache.hadoop.fs.Path
 import geotrellis.spark.io.hadoop.HdfsUtils
 import org.apache.accumulo.core.util.CachedConfiguration
+import org.apache.accumulo.core.conf.{AccumuloConfiguration, Property}
 
 class TableNotFoundError(table: String) extends Exception(s"Target Accumulo table `$table` does not exist.")
 
@@ -24,7 +25,7 @@ trait AccumuloDriver[K] extends Serializable {
   def decode(rdd: RDD[(Key, Value)], metaData: RasterMetaData): RasterRDD[K]
   def setFilters(job: Job, layerId: LayerId, filters: FilterSet[K])
   def rowId(id: LayerId, key: K): String
-  def getKey(id: LayerId, key: K) 
+  def getKey(id: LayerId, key: K): Key
     
   def load(sc: SparkContext, accumulo: AccumuloInstance)(id: LayerId, metaData: RasterMetaData, table: String, filters: FilterSet[K]): RasterRDD[K] = {
     val job = Job.getInstance(sc.hadoopConfiguration)
@@ -37,38 +38,41 @@ trait AccumuloDriver[K] extends Serializable {
 
   def loadTile(accumulo: AccumuloInstance)(id: LayerId, metaData: RasterMetaData, table: String, key: K): Tile
 
+  def accumuloIngestDir: Path = {
+    val conf = AccumuloConfiguration.getSiteConfiguration
+    new Path(conf.get(Property.INSTANCE_DFS_DIR), "ingest")
+  }
+
   /** NOTE: Accumulo will always perform destructive update, clobber param is not followed */
   def save(sc: SparkContext, accumulo: AccumuloInstance)(id: LayerId, raster: RasterRDD[K], table: String, clobber: Boolean): Unit = {
-    val connector = accumulo.connector
-    val ops = connector.tableOperations()
+    val connector = accumulo.connector    
+    val ops = connector.tableOperations()  
+    if (! ops.exists(table))  ops.create(table)
+    
     val groups = ops.getLocalityGroups(table)
-
-    if (! ops.exists(table)) 
-      ops.create(table)
     val newGroup: java.util.Set[Text] = Set(new Text(id.name))
     ops.setLocalityGroups(table, groups.updated(table, newGroup))
     
     val job = Job.getInstance(sc.hadoopConfiguration)
     val conf = job.getConfiguration
-
-    val basePath = new Path("hdfs://localhost/accumulo/ingest/")
-    val outPath = HdfsUtils.tmpPath(basePath, s"${id.name}-${id.zoom}", conf)    
-    val outPathString = outPath.toString
-
-    raster
-      .map { case (key, tile) => getKey(id, key) -> new Value(tile.toBytes) }
-      .sortByKey(ascending = true)
-      .saveAsNewAPIHadoopFile(outPathString, classOf[Key], classOf[Value], classOf[AccumuloFileOutputFormat], job.getConfiguration)
-
+    
+    val outPath = HdfsUtils.tmpPath(accumuloIngestDir, s"${id.name}-${id.zoom}", conf)        
     val failuresPath = outPath.suffix("-failures")
-    HdfsUtils.ensurePathExists(failuresPath, conf)
+    
+    try {
+      raster        
+        .map { case (key, tile) => getKey(id, key) -> new Value(tile.toBytes) }        
+        .sortByKey(ascending = true)
+        .saveAsNewAPIHadoopFile(outPath.toString, classOf[Key], classOf[Value], classOf[AccumuloFileOutputFormat], job.getConfiguration)
 
-    //this is required or accumulo code will not be able to read hdfs
-    CachedConfiguration.setInstance(conf)
-    ops.importDirectory(table, outPathString, failuresPath.toString, true)
+      HdfsUtils.ensurePathExists(failuresPath, conf)
 
-    HdfsUtils.deletePath(outPath, conf)
-    HdfsUtils.deletePath(failuresPath, conf)
+      ops.importDirectory(table, outPath.toString, failuresPath.toString, true)
+    } 
+    finally {
+      HdfsUtils.deletePath(outPath, conf)
+      HdfsUtils.deletePath(failuresPath, conf)
+    }
   }
 
  def getSplits(id: LayerId, rdd: RasterRDD[K], num: Int = 24): Seq[String] = {

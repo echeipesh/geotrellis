@@ -40,12 +40,7 @@ trait ZonalSummaryRoutes { self: HttpService with CorsSupport =>
       
         path("min") { 
           complete {    
-            import org.apache.accumulo.core.trace._
-            import org.apache.accumulo.fate.zookeeper.ZooReader
-            import org.apache.accumulo.trace.instrument._
-            
             val instance = catalog.instance.instance
-            val readSpan = Trace.start("collect")
             val ret = statsReponse(name,
               tiles
               .mapKeys { key => key.updateTemporalComponent(key.temporalKey.time.withMonthOfYear(1).withDayOfMonth(1).withHourOfDay(0)) }
@@ -53,7 +48,6 @@ trait ZonalSummaryRoutes { self: HttpService with CorsSupport =>
               .zonalSummaryByKey(polygon, Double.MaxValue, MinDouble, stk => stk.temporalComponent.time)
               .collect
               .sortBy(_._1) )
-            readSpan.stop()
             ret
           } 
         } ~          

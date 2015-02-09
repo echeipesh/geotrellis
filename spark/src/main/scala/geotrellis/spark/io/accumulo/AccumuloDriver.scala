@@ -32,7 +32,7 @@ trait AccumuloDriver[K] extends Serializable {
     accumulo.setAccumuloConfig(job)
     InputFormatBase.setInputTableName(job, table)
     setFilters(job, id, filters)
-    val rdd = sc.newAPIHadoopRDD(job.getConfiguration, classOf[AccumuloInputFormat], classOf[Key], classOf[Value])
+    val rdd = sc.newAPIHadoopRDD(job.getConfiguration, classOf[BatchAccumuloInputFormat], classOf[Key], classOf[Value])
     decode(rdd, metaData)
   }
 

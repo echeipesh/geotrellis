@@ -11,12 +11,14 @@ import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
 import org.apache.spark.rdd.RDD
 import scala.collection.mutable
+import scala.collection.JavaConverters._
 import scala.collection.JavaConversions._
 import scala.reflect.ClassTag
 import org.apache.hadoop.fs.Path
 import geotrellis.spark.io.hadoop.HdfsUtils
 import org.apache.accumulo.core.util.CachedConfiguration
 import org.apache.accumulo.core.conf.{AccumuloConfiguration, Property}
+import geotrellis.raster.stats.FastMapHistogram
 
 class TableNotFoundError(table: String) extends Exception(s"Target Accumulo table `$table` does not exist.")
 
@@ -43,8 +45,58 @@ trait AccumuloDriver[K] extends Serializable {
     new Path(conf.get(Property.INSTANCE_DFS_DIR), "ingest")
   }
 
+  def save(sc: SparkContext, accumulo: AccumuloInstance)(id: LayerId, raster: RasterRDD[K], table: String, clobber: Boolean): FastMapHistogram = {
+    val connector = accumulo.connector    
+    val ops = connector.tableOperations()  
+    if (! ops.exists(table))  ops.create(table)
+    
+    val groups = ops.getLocalityGroups(table)
+    val newGroup: java.util.Set[Text] = Set(new Text(id.name))
+    ops.setLocalityGroups(table, groups.updated(table, newGroup))
+    
+    val job = Job.getInstance(sc.hadoopConfiguration)
+    val conf = job.getConfiguration    
+
+    val splits = getSplits(id, raster)
+    ops.addSplits(table, new java.util.TreeSet(splits.map(new Text(_))))
+
+    val bcCon = sc.broadcast(connector)
+    
+    val rddHist = 
+    raster.mapPartitions{ pairs =>      
+      val partitionHist = FastMapHistogram() 
+      var mutations = Map.empty[String, Mutation]
+
+      pairs.foreach { case (key, tile) =>
+        partitionHist.update(FastMapHistogram.fromTile(tile))
+
+        val rid = rowId(id, key)        
+        val mut = mutations.getOrElse(rid, new Mutation(rid))
+        val rowKey = getKey(id, key)
+        mut.put(rowKey.getColumnFamily, rowKey.getColumnQualifier, 
+          System.currentTimeMillis(), new Value(tile.toBytes))
+        mutations = mutations.updated(rid, mut)        
+      }
+
+      val batchConf = new BatchWriterConfig()
+        .setMaxMemory(10*1024*1012) 
+        .setMaxWriteThreads(12)         
+      val writer = bcCon.value.createBatchWriter(table, batchConf)
+      //We've just taken a lot of memory converting all the tiles to bites
+      // there does not seem to be an expidient way to avoid it
+      writer.addMutations(mutations.values.asJava)
+      writer.close()
+      Iterator(partitionHist)
+    }
+    .collect
+    .foldLeft(FastMapHistogram()){ (acc, h) => acc.update(h); acc }
+    // We actually have nothing to do with the histogram here, lets dump it for our viewign pleasure
+    println(rddHist)
+    rddHist
+  }
+
   /** NOTE: Accumulo will always perform destructive update, clobber param is not followed */
-  def save(sc: SparkContext, accumulo: AccumuloInstance)(id: LayerId, raster: RasterRDD[K], table: String, clobber: Boolean): Unit = {
+  def saveAsFile(sc: SparkContext, accumulo: AccumuloInstance)(id: LayerId, raster: RasterRDD[K], table: String, clobber: Boolean): Unit = {
     val connector = accumulo.connector    
     val ops = connector.tableOperations()  
     if (! ops.exists(table))  ops.create(table)

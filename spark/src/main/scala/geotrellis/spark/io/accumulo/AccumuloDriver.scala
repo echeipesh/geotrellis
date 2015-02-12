@@ -65,17 +65,15 @@ trait AccumuloDriver[K] extends Serializable {
     val rddHist = 
     raster.mapPartitions{ pairs =>      
       val partitionHist = FastMapHistogram() 
-      var mutations = Map.empty[String, Mutation]
+      var rows = Map.empty[String, List[(Key, Tile)]]
 
       pairs.foreach { case (key, tile) =>
         partitionHist.update(FastMapHistogram.fromTile(tile))
 
         val rid = rowId(id, key)        
-        val mut = mutations.getOrElse(rid, new Mutation(rid))
+        val list = rows.getOrElse(rid, Nil)
         val rowKey = getKey(id, key)
-        mut.put(rowKey.getColumnFamily, rowKey.getColumnQualifier, 
-          System.currentTimeMillis(), new Value(tile.toBytes))
-        mutations = mutations.updated(rid, mut)        
+        rows = rows.updated(rid, rowKey -> tile :: list)
       }
 
       val batchConf = new BatchWriterConfig()
@@ -84,7 +82,15 @@ trait AccumuloDriver[K] extends Serializable {
       val writer = bcCon.value.createBatchWriter(table, batchConf)
       //We've just taken a lot of memory converting all the tiles to bites
       // there does not seem to be an expidient way to avoid it
-      writer.addMutations(mutations.values.asJava)
+      
+      rows.foreach { case (rid, list) => 
+        val mut = new Mutation(rid)
+        list.foreach { case (rowKey, tile) =>
+          mut.put(rowKey.getColumnFamily, rowKey.getColumnQualifier, 
+            System.currentTimeMillis(), new Value(tile.toBytes))
+        }
+        writer.addMutation(mut)
+      }      
       writer.close()
       Iterator(partitionHist)
     }

@@ -45,7 +45,57 @@ trait AccumuloDriver[K] extends Serializable {
     new Path(conf.get(Property.INSTANCE_DFS_DIR), "ingest")
   }
 
-  def save(sc: SparkContext, accumulo: AccumuloInstance)(id: LayerId, raster: RasterRDD[K], table: String, clobber: Boolean): FastMapHistogram = {
+
+  def save(sc: SparkContext, accumulo: AccumuloInstance)(id: LayerId, raster: RasterRDD[K], table: String, clobber: Boolean): Unit = {
+    val connector = accumulo.connector    
+    val ops = connector.tableOperations()  
+    if (! ops.exists(table))  ops.create(table)
+    
+    val groups = ops.getLocalityGroups(table)
+    val newGroup: java.util.Set[Text] = Set(new Text(id.name))
+    ops.setLocalityGroups(table, groups.updated(table, newGroup))
+    
+    val job = Job.getInstance(sc.hadoopConfiguration)
+    val conf = job.getConfiguration    
+
+    val splits = getSplits(id, raster)
+    ops.addSplits(table, new java.util.TreeSet(splits.map(new Text(_))))
+
+    val bcCon = sc.broadcast(connector)
+    
+    val mutations = 
+    raster.mapPartitions{ pairs =>
+      val partitionHist = FastMapHistogram() 
+      var rows = Map.empty[String, List[(Key, Tile)]]
+
+      pairs.foreach { case (key, tile) =>
+        partitionHist.update(FastMapHistogram.fromTile(tile))
+
+        val rid = rowId(id, key)        
+        val list = rows.getOrElse(rid, Nil)
+        val rowKey = getKey(id, key)
+        rows = rows.updated(rid, rowKey -> tile :: list)
+      }
+      
+      println(partitionHist)
+
+      rows.map { case (rid, list) => 
+        val mut = new Mutation(rid)
+        list.foreach { case (rowKey, tile) =>
+          mut.put(rowKey.getColumnFamily, rowKey.getColumnQualifier, 
+            System.currentTimeMillis(), new Value(tile.toBytes))
+        }
+        (null, mut)
+      }.toIterator
+    }
+    
+    accumulo.setAccumuloConfig(job)
+    AccumuloOutputFormat.setBatchWriterOptions(job, new BatchWriterConfig())
+    AccumuloOutputFormat.setDefaultTableName(job, table)    
+    mutations.saveAsNewAPIHadoopFile(accumulo.instanceName, classOf[Text], classOf[Mutation], classOf[AccumuloOutputFormat], job.getConfiguration)
+  }
+
+  def saveWithBW(sc: SparkContext, accumulo: AccumuloInstance)(id: LayerId, raster: RasterRDD[K], table: String, clobber: Boolean): FastMapHistogram = {
     val connector = accumulo.connector    
     val ops = connector.tableOperations()  
     if (! ops.exists(table))  ops.create(table)
@@ -63,7 +113,7 @@ trait AccumuloDriver[K] extends Serializable {
     val bcCon = sc.broadcast(connector)
     
     val rddHist = 
-    raster.mapPartitions{ pairs =>      
+    raster.mapPartitions{ pairs =>
       val partitionHist = FastMapHistogram() 
       var rows = Map.empty[String, List[(Key, Tile)]]
 
@@ -77,8 +127,8 @@ trait AccumuloDriver[K] extends Serializable {
       }
 
       val batchConf = new BatchWriterConfig()
-        .setMaxMemory(10*1024*1012) 
-        .setMaxWriteThreads(12)         
+        .setMaxMemory(10*1024*1024) 
+        .setMaxWriteThreads(12)
       val writer = bcCon.value.createBatchWriter(table, batchConf)
       //We've just taken a lot of memory converting all the tiles to bites
       // there does not seem to be an expidient way to avoid it

@@ -102,7 +102,7 @@ object Benchmark extends ArgMain[BenchmarkArgs] with Logging {
         catalog.load[SpaceTimeKey](layer1, FilterSet(SpaceFilter[SpaceTimeKey](bounds))).cache
       }
       val rdd2 = {
-        val (lmd, params) = catalog.metaDataCatalog.load(layer1)
+        val (lmd, params) = catalog.metaDataCatalog.load(layer2)
         val md = lmd.rasterMetaData  
         val bounds = md.mapTransform(polygon.envelope)
         catalog.load[SpaceTimeKey](layer2, FilterSet(SpaceFilter[SpaceTimeKey](bounds))).cache

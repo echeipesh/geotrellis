@@ -101,7 +101,7 @@ trait AccumuloDriver[K] extends Serializable {
     mutations.saveAsNewAPIHadoopFile(accumulo.instanceName, classOf[Text], classOf[Mutation], classOf[AccumuloOutputFormat], job.getConfiguration)
   }
 
-  def save(sc: SparkContext, accumulo: AccumuloInstance)(id: LayerId, raster: RasterRDD[K], table: String, clobber: Boolean): Unit = {
+  def saveWithHistogram(sc: SparkContext, accumulo: AccumuloInstance)(id: LayerId, raster: RasterRDD[K], table: String, clobber: Boolean): Unit = {
     val connector = accumulo.connector    
     val ops = connector.tableOperations()  
     if (! ops.exists(table))  ops.create(table)
@@ -165,7 +165,7 @@ trait AccumuloDriver[K] extends Serializable {
   }
 
   /** NOTE: Accumulo will always perform destructive update, clobber param is not followed */
-  def saveAsFile(sc: SparkContext, accumulo: AccumuloInstance)(id: LayerId, raster: RasterRDD[K], table: String, clobber: Boolean): Unit = {
+  def save(sc: SparkContext, accumulo: AccumuloInstance)(id: LayerId, raster: RasterRDD[K], table: String, clobber: Boolean): Unit = {
     val connector = accumulo.connector    
     val ops = connector.tableOperations()  
     if (! ops.exists(table))  ops.create(table)
@@ -190,10 +190,6 @@ trait AccumuloDriver[K] extends Serializable {
 
       ops.importDirectory(table, outPath.toString, failuresPath.toString, true)
     } 
-    finally {
-      HdfsUtils.deletePath(outPath, conf)
-      HdfsUtils.deletePath(failuresPath, conf)
-    }
   }
 
  def getSplits(id: LayerId, rdd: RasterRDD[K], num: Int = 24): Seq[String] = {

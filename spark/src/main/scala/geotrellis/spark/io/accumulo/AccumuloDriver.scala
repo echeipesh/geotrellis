@@ -19,6 +19,7 @@ import geotrellis.spark.io.hadoop.HdfsUtils
 import org.apache.accumulo.core.util.CachedConfiguration
 import org.apache.accumulo.core.conf.{AccumuloConfiguration, Property}
 import geotrellis.raster.stats.FastMapHistogram
+import java.util.concurrent.TimeUnit
 
 class TableNotFoundError(table: String) extends Exception(s"Target Accumulo table `$table` does not exist.")
 
@@ -90,8 +91,13 @@ trait AccumuloDriver[K] extends Serializable {
     }
     
     accumulo.setAccumuloConfig(job)
-    AccumuloOutputFormat.setBatchWriterOptions(job, new BatchWriterConfig())
-    AccumuloOutputFormat.setDefaultTableName(job, table)    
+    AccumuloOutputFormat.setBatchWriterOptions(job, 
+      new BatchWriterConfig()
+        .setMaxMemory(4*1024*1024) 
+        .setMaxWriteThreads(24)
+        .setMaxLatency(5, TimeUnit.SECONDS))
+    AccumuloOutputFormat.setDefaultTableName(job, table) 
+
     mutations.saveAsNewAPIHadoopFile(accumulo.instanceName, classOf[Text], classOf[Mutation], classOf[AccumuloOutputFormat], job.getConfiguration)
   }
 

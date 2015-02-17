@@ -28,6 +28,7 @@ import geotrellis.spark.tiling._
 import geotrellis.raster._
 import geotrellis.proj4._
 import org.apache.spark.rdd._
+import org.apache.spark.storage.StorageLevel
 import scala.reflect.ClassTag
 
 object ClosedIngest {
@@ -68,7 +69,7 @@ object ClosedIngest {
       RasterMetaData.fromRdd(reprojectedTiles, destCRS, layoutScheme, isUniform) { key: T =>
         key.projectedExtent.extent
       }
-    val rasterRdd = tiler(reprojectedTiles, rasterMetaData).cache()    
+    val rasterRdd = tiler(reprojectedTiles, rasterMetaData).persist(StorageLevel.MEMORY_AND_DISK_SER)    
 
     rasterRdd.foreach(x => {})                      // force materialization
     reprojectedTiles.unpersist(blocking = false)    // free up memory since rasterRDD is cached

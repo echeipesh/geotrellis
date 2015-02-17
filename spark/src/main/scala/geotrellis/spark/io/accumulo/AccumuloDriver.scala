@@ -140,6 +140,7 @@ trait AccumuloDriver[K] extends Serializable {
   
       //We've just taken a lot of memory converting all the tiles to bites
       // there does not seem to be an expidient way to avoid it    
+      var counter = 0
       rows.foreach { case (rid, list) => 
         val mut = new Mutation(rid)
         list.foreach { case (rowKey, tile) =>
@@ -147,6 +148,11 @@ trait AccumuloDriver[K] extends Serializable {
             System.currentTimeMillis(), new Value(tile.toBytes))
         }
         writer.addMutation(mut)
+        
+        //Lets try to clear the pipes a little and stave off overflows
+        counter += 1
+        counter %= 100
+        if (counter == 0) writer.flush()
       }      
       writer.close()
       Iterator(partitionHist)

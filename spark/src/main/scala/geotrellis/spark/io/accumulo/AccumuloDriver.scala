@@ -47,7 +47,7 @@ trait AccumuloDriver[K] extends Serializable {
   }
 
 
-  def save(sc: SparkContext, accumulo: AccumuloInstance)(id: LayerId, raster: RasterRDD[K], table: String, clobber: Boolean): Unit = {
+  def saveWithIf(sc: SparkContext, accumulo: AccumuloInstance)(id: LayerId, raster: RasterRDD[K], table: String, clobber: Boolean): Unit = {
     val connector = accumulo.connector    
     val ops = connector.tableOperations()  
     if (! ops.exists(table))  ops.create(table)
@@ -101,7 +101,7 @@ trait AccumuloDriver[K] extends Serializable {
     mutations.saveAsNewAPIHadoopFile(accumulo.instanceName, classOf[Text], classOf[Mutation], classOf[AccumuloOutputFormat], job.getConfiguration)
   }
 
-  def saveWithBW(sc: SparkContext, accumulo: AccumuloInstance)(id: LayerId, raster: RasterRDD[K], table: String, clobber: Boolean): FastMapHistogram = {
+  def save(sc: SparkContext, accumulo: AccumuloInstance)(id: LayerId, raster: RasterRDD[K], table: String, clobber: Boolean): Unit = {
     val connector = accumulo.connector    
     val ops = connector.tableOperations()  
     if (! ops.exists(table))  ops.create(table)
@@ -132,13 +132,14 @@ trait AccumuloDriver[K] extends Serializable {
         rows = rows.updated(rid, rowKey -> tile :: list)
       }
 
-      val batchConf = new BatchWriterConfig()
-        .setMaxMemory(10*1024*1024) 
-        .setMaxWriteThreads(12)
-      val writer = bcCon.value.createBatchWriter(table, batchConf)
+      val writer = bcCon.value.createBatchWriter(table, 
+        new BatchWriterConfig()
+          .setMaxMemory(4*1024*1024) 
+          .setMaxWriteThreads(24)
+          .setMaxLatency(5, TimeUnit.SECONDS))
+  
       //We've just taken a lot of memory converting all the tiles to bites
-      // there does not seem to be an expidient way to avoid it
-      
+      // there does not seem to be an expidient way to avoid it    
       rows.foreach { case (rid, list) => 
         val mut = new Mutation(rid)
         list.foreach { case (rowKey, tile) =>

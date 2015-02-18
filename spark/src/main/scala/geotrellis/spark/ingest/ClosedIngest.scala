@@ -69,7 +69,7 @@ object ClosedIngest {
       RasterMetaData.fromRdd(reprojectedTiles, destCRS, layoutScheme, isUniform) { key: T =>
         key.projectedExtent.extent
       }
-    val rasterRdd = tiler(reprojectedTiles, rasterMetaData).persist(StorageLevel.MEMORY_AND_DISK)    
+    val rasterRdd = tiler(reprojectedTiles, rasterMetaData).persist(StorageLevel.MEMORY_ONLY)    
 
     rasterRdd.foreach(x => {})                      // force materialization
     reprojectedTiles.unpersist(blocking = false)    // free up memory since rasterRDD is cached

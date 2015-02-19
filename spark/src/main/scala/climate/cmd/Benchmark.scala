@@ -106,32 +106,32 @@ object Benchmark extends ArgMain[BenchmarkArgs] with Logging {
       }
     }
 
-    println("------ Multi-Model Benchmark ------")
     for ( (name, polygon) <- extents) {
-    
-      val rdds = layers.map { layer =>
-        val (lmd, params) = catalog.metaDataCatalog.load(layer)
-        val md = lmd.rasterMetaData  
-        val bounds = md.mapTransform(polygon.envelope)
-        catalog.load[SpaceTimeKey](layer, FilterSet(SpaceFilter[SpaceTimeKey](bounds))).cache
-      }
-
-      for ((layer, rdd) <- layers zip rdds) {
-        Timer.timedTask(s"Load RDD: $layer"){
-          rdd.count
+      Timer.timedTask(s"------ Multi-Model Benchmark ------ : $name") {
+        val rdds = layers.map { layer =>
+          val (lmd, params) = catalog.metaDataCatalog.load(layer)
+          val md = lmd.rasterMetaData  
+          val bounds = md.mapTransform(polygon.envelope)
+          catalog.load[SpaceTimeKey](layer, FilterSet(SpaceFilter[SpaceTimeKey](bounds))).cache
         }
-      }
 
-      Timer.timedTask(s"Multi-Model Average  by union for: ${layers}") {
-        new RasterRDD[SpaceTimeKey](rdds.reduce(_ union _), rdds.head.metaData)
-          .averageByKey
-          .foreachPartition(_ => {})
-      }
+        for ((layer, rdd) <- layers zip rdds) {
+          Timer.timedTask(s"Load RDD: $layer"){
+            rdd.count
+          }
+        }
 
-      Timer.timedTask(s"Multi-Model Average  by union for: ${layers}") {
-        new RasterRDD[SpaceTimeKey](rdds.reduce(_ union _), rdds.head.metaData)
-          rdds.head.combineTiles(rdds.tail)(local.Mean.apply)
-          .foreachPartition(_ => {})
+        Timer.timedTask(s"Multi-Model Average  by .averageByKey for: ${layers}") {
+          new RasterRDD[SpaceTimeKey](rdds.reduce(_ union _), rdds.head.metaData)
+            .averageByKey
+            .foreachPartition(_ => {})
+        }
+
+        Timer.timedTask(s"Multi-Model Average  by union for: ${layers}") {
+          new RasterRDD[SpaceTimeKey](rdds.reduce(_ union _), rdds.head.metaData)
+            rdds.head.combineTiles(rdds.tail)(local.Mean.apply)
+            .foreachPartition(_ => {})
+        }
       }
     }
   }

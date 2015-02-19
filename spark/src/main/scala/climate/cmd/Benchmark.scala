@@ -9,7 +9,9 @@ import geotrellis.spark.io.hadoop._
 import geotrellis.spark.io.accumulo._
 import geotrellis.spark.op.stats._
 import geotrellis.spark.utils.SparkUtils
+import geotrellis.proj4._
 import geotrellis.vector._
+import geotrellis.vector.reproject._
 import org.apache.accumulo.core.client.security.tokens.PasswordToken
 import org.apache.hadoop.fs.Path
 import org.apache.spark._
@@ -44,7 +46,7 @@ object Extents extends GeoJsonSupport {
           [-75.2947998046875,40.04023218690448],
           [-74.9432373046875,40.04023218690448],
           [-74.9432373046875,39.863371338285305],
-          [-75.2947998046875,39.863371338285305]]]}}""".parseJson.convertTo[Polygon],
+          [-75.2947998046875,39.863371338285305]]]}}""".parseJson.convertTo[Polygon].reproject(LatLng, WebMercator),
     "eastKansas" ->
       """{"type":"Feature","properties":{"name":9},"geometry":{
           "type":"Polygon",
@@ -53,7 +55,7 @@ object Extents extends GeoJsonSupport {
             [-98.26171875,39.9434364619742],
             [-94.6142578125,39.9434364619742],
             [-94.6142578125,37.055177106660814],
-            [-98.26171875,37.055177106660814]]]}}""".parseJson.convertTo[Polygon],
+            [-98.26171875,37.055177106660814]]]}}""".parseJson.convertTo[Polygon].reproject(LatLng, WebMercator),
     "Rockies" -> 
       """{"type":"Feature","properties":{"name":3},"geometry":{
           "type":"Polygon",
@@ -62,7 +64,7 @@ object Extents extends GeoJsonSupport {
             [-120.23437499999999,48.19643332981063],
             [-107.9296875,48.19643332981063],
             [-107.9296875,32.69746078939034],
-            [-120.23437499999999,32.69746078939034]]]}}""".parseJson.convertTo[Polygon],
+            [-120.23437499999999,32.69746078939034]]]}}""".parseJson.convertTo[Polygon].reproject(LatLng, WebMercator),
     "USA" -> 
       """{"type":"Feature","properties":{"name":3},"geometry":{
           "type":"Polygon",
@@ -71,7 +73,7 @@ object Extents extends GeoJsonSupport {
             [-124.9132294655,49.2204934537],
             [-66.6759185791,49.2204934537],
             [-66.6759185791,25.6804735519],
-            [-124.9132294655,25.6804735519]]]}}""".parseJson.convertTo[Polygon]
+            [-124.9132294655,25.6804735519]]]}}""".parseJson.convertTo[Polygon].reproject(LatLng, WebMercator)
   )
 }
 

@@ -18,8 +18,19 @@ import geotrellis.spark.op.zonal.summary._
 import geotrellis.raster.op.zonal.summary._
 import geotrellis.spark.op.stats._
 import com.github.nscala_time.time.Imports._
+import geotrellis.raster.op.local
 
 class BenchmarkArgs extends AccumuloArgs {
+  /** Comma seprated list of layerId:Zoom */
+  @Required var layers: String = _
+
+  def getLayers: Array[LayerId] = 
+    layers
+      .split(",")
+      .map{ str => 
+        val Array(name, zoom) = str.split(":")
+        LayerId(name, zoom.toInt)
+      }
 }
 
 object Extents extends GeoJsonSupport {
@@ -61,6 +72,7 @@ object Benchmark extends ArgMain[BenchmarkArgs] with Logging {
   val layer1 = LayerId("pr-rcp26-ccsm4", zoom)
   val layer2 = LayerId("pr-rcp45-ccsm4", zoom)
   
+
   def zonalSummary(rdd: RasterRDD[SpaceTimeKey], polygon: Polygon) = {
     rdd
       .mapKeys { key => key.updateTemporalComponent(key.temporalKey.time.withMonthOfYear(1).withDayOfMonth(1).withHourOfDay(0)) }
@@ -73,15 +85,17 @@ object Benchmark extends ArgMain[BenchmarkArgs] with Logging {
   def main(args: BenchmarkArgs): Unit = {
     implicit val sparkContext = SparkUtils.createSparkContext("Benchmark")
 
+    val layers = args.getLayers
+
     val accumulo = AccumuloInstance(args.instance, args.zookeeper, args.user, new PasswordToken(args.password))
     val catalog = accumulo.catalog
 
     println("------ Single Model Benchmark ------")
     for ( (name, polygon) <- extents) {
-      val (lmd, params) = catalog.metaDataCatalog.load(layer1)
+      val (lmd, params) = catalog.metaDataCatalog.load(layers.head)
       val md = lmd.rasterMetaData  
       val bounds = md.mapTransform(polygon.envelope)
-      val rdd1 = catalog.load[SpaceTimeKey](layer1, FilterSet(SpaceFilter[SpaceTimeKey](bounds))).cache
+      val rdd1 = catalog.load[SpaceTimeKey](layers.head, FilterSet(SpaceFilter[SpaceTimeKey](bounds))).cache
     
       Timer.timedTask(s"Load $name"){
         rdd1.count
@@ -95,31 +109,28 @@ object Benchmark extends ArgMain[BenchmarkArgs] with Logging {
     println("------ Multi-Model Benchmark ------")
     for ( (name, polygon) <- extents) {
     
-      val rdd1 = {
-        val (lmd, params) = catalog.metaDataCatalog.load(layer1)
+      val rdds = layers.map { layer =>
+        val (lmd, params) = catalog.metaDataCatalog.load(layer)
         val md = lmd.rasterMetaData  
         val bounds = md.mapTransform(polygon.envelope)
-        catalog.load[SpaceTimeKey](layer1, FilterSet(SpaceFilter[SpaceTimeKey](bounds))).cache
-      }
-      val rdd2 = {
-        val (lmd, params) = catalog.metaDataCatalog.load(layer2)
-        val md = lmd.rasterMetaData  
-        val bounds = md.mapTransform(polygon.envelope)
-        catalog.load[SpaceTimeKey](layer2, FilterSet(SpaceFilter[SpaceTimeKey](bounds))).cache
+        catalog.load[SpaceTimeKey](layer, FilterSet(SpaceFilter[SpaceTimeKey](bounds))).cache
       }
 
-    
-      Timer.timedTask(s"Load rdd1 $name"){
-        rdd1.count
-      }
-      Timer.timedTask(s"Load rdd2 $name"){
-        rdd1.count
+      for ((layer, rdd) <- layers zip rdds) {
+        Timer.timedTask(s"Load RDD: $layer"){
+          rdd.count
+        }
       }
 
-
-      Timer.timedTask(s"Multi-Model Average for $name") {
-        new RasterRDD[SpaceTimeKey](rdd1.union(rdd2), rdd1.metaData)
+      Timer.timedTask(s"Multi-Model Average  by union for: ${layers}") {
+        new RasterRDD[SpaceTimeKey](rdds.reduce(_ union _), rdds.head.metaData)
           .averageByKey
+          .foreachPartition(_ => {})
+      }
+
+      Timer.timedTask(s"Multi-Model Average  by union for: ${layers}") {
+        new RasterRDD[SpaceTimeKey](rdds.reduce(_ union _), rdds.head.metaData)
+          rdds.head.combineTiles(rdds.tail)(local.Mean.apply)
           .foreachPartition(_ => {})
       }
     }

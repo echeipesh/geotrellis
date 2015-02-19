@@ -62,7 +62,13 @@ class RasterRDD[K: ClassTag](val tileRdd: RDD[(K, Tile)], val metaData: RasterMe
       }
     }
 
-  def combinePairs(others: Seq[RasterRDD[K]])(f: (Seq[(K, Tile)] => (K, Tile))): RasterRDD[K] = {
+  def combineTiles(other: RasterRDD[K])(f: (Tile, Tile) => Tile): RasterRDD[K] =
+    combinePairs(other) { case ((k1, t1), (k2, t2)) => (k1, f(t1, t2)) }
+
+  def combineTiles(others: Traversable[RasterRDD[K]])(f: Seq[Tile] => Tile): RasterRDD[K] =
+    combinePairs(others) { pairs => pairs.head._1 -> f(pairs.map(_._2)) }
+
+  def combinePairs(others: Traversable[RasterRDD[K]])(f: (Seq[(K, Tile)] => (K, Tile))): RasterRDD[K] = {
     def create(t: (K, Tile)) = Seq(t)
     def mergeValue(ts: Seq[(K, Tile)], t: (K, Tile)) = ts :+ t
     def mergeContainers(ts1: Seq[(K, Tile)], ts2: Seq[(K, Tile)]) = ts1 ++ ts2
@@ -75,6 +81,18 @@ class RasterRDD[K: ClassTag](val tileRdd: RDD[(K, Tile)], val metaData: RasterMe
         .combineByKey(create, mergeValue, mergeContainers)
         .map { case (id, tiles) => f(tiles) }
     }
+  }
+
+  def union(other: RasterRDD[K]): RasterRDD[K] = {    
+    require(metaData.cellType == other.metaData.cellType, 
+      s"CellTypes of unioned rasters match: ${metaData.cellType} != ${other.metaData.cellType}")
+    require(metaData.crs == other.metaData.crs, 
+      s"CRS of unioned rasters match: ${metaData.crs} != ${other.metaData.crs}")
+    require(metaData.tileLayout == other.metaData.tileLayout, 
+      s"TileLayout of unioned rasters match: ${metaData.tileLayout} != ${other.metaData.tileLayout}")
+    
+    new RasterRDD(tileRdd union other.tileRdd, 
+      metaData.copy(extent = metaData.extent combine other.metaData.extent))
   }
 
   def minMax: (Int, Int) =

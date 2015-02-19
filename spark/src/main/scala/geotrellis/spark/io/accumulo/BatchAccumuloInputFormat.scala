@@ -15,6 +15,8 @@ import org.apache.accumulo.core.security.CredentialHelper
 import org.apache.accumulo.core.util.UtilWaitThread
 import org.apache.hadoop.mapreduce.{RecordReader, TaskAttemptContext, InputSplit, JobContext}
 import scala.collection.JavaConverters._
+import scalaz.Memo
+import java.net.InetAddress
 
 /** This input format will use Accumulo [TabletLocator] to create InputSplits for each tablet that contains
  * records from specified ranges. This is unlike AccumuloInputFormat which creates a single split per Range.
@@ -67,10 +69,17 @@ class BatchAccumuloInputFormat extends InputFormatBase[Key, Value] {
       UtilWaitThread.sleep(100 + (Math.random * 100).toInt)
       tabletLocator.invalidateCache()
     }
-    // location: String = server:ip for the tablet server
-    // list: Map[KeyExtent, List[ARange]]
-    binnedRanges.asScala map { case (location, list) =>
-      list.asScala.map { case (keyExtent, extentRanges) =>        
+
+    val resolveHostname: String => String = 
+      Memo.mutableHashMapMemo { ip =>
+          val inetAddress = InetAddress.getByName(ip)
+          inetAddress.getCanonicalHostName()
+      }
+
+    // tserver: String = server:ip for the tablet server
+    // tserverBin: Map[KeyExtent, List[ARange]]
+    binnedRanges.asScala map { case (tserver, tserverBin) =>      
+      tserverBin.asScala.map { case (keyExtent, extentRanges) =>        
         val tabletRange = keyExtent.toDataRange        
         val split = new MultiRangeInputSplit()
         val exr = extentRanges.asScala
@@ -80,7 +89,7 @@ class BatchAccumuloInputFormat extends InputFormatBase[Key, Value] {
           else 
             exr map { tabletRange.clip }
         split.iterators = IC.getIterators(CLASS, conf).asScala.toList
-        split.location = location
+        split.location = resolveHostname(tserver.split(":").head)
         split.table = tableName
         split.instanceName = instance.getInstanceName
         split.zooKeepers = instance.getZooKeepers

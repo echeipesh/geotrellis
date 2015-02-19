@@ -34,6 +34,7 @@ object Dependencies {
 
   val monocleCore   = "com.github.julien-truffaut" %% "monocle-core"    % Version.monocle
   val monocleMacro  = "com.github.julien-truffaut" %% "monocle-macro"   % Version.monocle
+  val scalaz        = "org.scalaz"                 %% "scalaz-core"     % Version.scalaz
 
   val openCSV       = "net.sf.opencsv" % "opencsv"      % "2.3"
 
@@ -74,4 +75,5 @@ object Dependencies {
 
   // val xz            = "org.tukaani"            %   "xz"         % "1.5"
   val awsSdkS3      = "com.amazonaws" % "aws-java-sdk-s3" % "1.9.16"
+
 }

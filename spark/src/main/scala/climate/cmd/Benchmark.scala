@@ -102,26 +102,34 @@ object Benchmark extends ArgMain[BenchmarkArgs] with Logging {
       (name, polygon) <- extents
       count <- 1 to 3
     } {
-      val (lmd, params) = catalog.metaDataCatalog.load(layers.head)
-      val md = lmd.rasterMetaData  
-      val bounds = md.mapTransform(polygon.envelope)
-      println(s"POLYGON: $polygon, ENV: ${polygon.envelope}, BOUNDS: $bounds")
-      val rdd1 = catalog.load[SpaceTimeKey](layers.head, FilterSet(SpaceFilter[SpaceTimeKey](bounds))).cache
-    
-      Timer.timedTask(s"Load $name"){
-        rdd1.count
-      }
 
-      Timer.timedTask(s"Zonal Summary $name") {
-        zonalSummary(rdd1, polygon)      
+
+      Timer.timedTask(s"TOTAL Single: $name"){  
+        
+        val (lmd, params) = catalog.metaDataCatalog.load(layers.head)
+        val md = lmd.rasterMetaData  
+        val bounds = md.mapTransform(polygon.envelope)
+        
+        val rdd1 = catalog.load[SpaceTimeKey](layers.head, FilterSet(SpaceFilter[SpaceTimeKey](bounds))).cache
+      
+        Timer.timedTask(s"- Load Tiles"){
+          rdd1.count
+        }
+
+        Timer.timedTask(s"- Zonal Summary Calclutation") {
+          zonalSummary(rdd1, polygon)      
+        }
+
+        rdd1.unpersist()
       }
     }
-// TODO: have caliper hit this
+
+    // TODO: have caliper hit this
     for { 
       (name, polygon) <- extents
       count <- 1 to 3
     } {
-      Timer.timedTask(s"------ Multi-Model Benchmark ------ : $name") {
+      Timer.timedTask(s"TTOTAL Multi-Model: $name") {
         val rdds = layers.map { layer =>
           val (lmd, params) = catalog.metaDataCatalog.load(layer)
           val md = lmd.rasterMetaData  
@@ -130,18 +138,18 @@ object Benchmark extends ArgMain[BenchmarkArgs] with Logging {
         }
 
         for ((layer, rdd) <- layers zip rdds) {
-          Timer.timedTask(s"Load RDD: $layer"){
+          Timer.timedTask(s"- Load RDD: $layer"){
             rdd.count
           }
         }
 
-        Timer.timedTask(s"Multi-Model Average  by .averageByKey for: ${layers}") {
+        Timer.timedTask(s"- average with .averageByKey for: ${layers.toList}") {
           new RasterRDD[SpaceTimeKey](rdds.reduce(_ union _), rdds.head.metaData)
             .averageByKey
             .foreachPartition(_ => {})
         }
 
-        Timer.timedTask(s"Multi-Model Average  by union for: ${layers}") {
+        Timer.timedTask(s"- average with union for: ${layers.toList}") {
           new RasterRDD[SpaceTimeKey](rdds.reduce(_ union _), rdds.head.metaData)
             rdds.head.combineTiles(rdds.tail)(local.Mean.apply)
             .foreachPartition(_ => {})

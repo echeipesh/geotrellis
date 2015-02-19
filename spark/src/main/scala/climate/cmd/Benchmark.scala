@@ -96,7 +96,10 @@ object Benchmark extends ArgMain[BenchmarkArgs] with Logging {
     val catalog = accumulo.catalog
 
     println("------ Single Model Benchmark ------")
-    for ( (name, polygon) <- extents.reverse) {
+    for { 
+      (name, polygon) <- extents
+      count <- 1 to 3
+    } {
       val (lmd, params) = catalog.metaDataCatalog.load(layers.head)
       val md = lmd.rasterMetaData  
       val bounds = md.mapTransform(polygon.envelope)
@@ -112,7 +115,10 @@ object Benchmark extends ArgMain[BenchmarkArgs] with Logging {
       }
     }
 // TODO: have caliper hit this
-    for ( (name, polygon) <- extents.reverse) {
+    for { 
+      (name, polygon) <- extents
+      count <- 1 to 3
+    } {
       Timer.timedTask(s"------ Multi-Model Benchmark ------ : $name") {
         val rdds = layers.map { layer =>
           val (lmd, params) = catalog.metaDataCatalog.load(layer)

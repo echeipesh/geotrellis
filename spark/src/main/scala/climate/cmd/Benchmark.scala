@@ -62,17 +62,22 @@ object Extents extends GeoJsonSupport {
             [-120.23437499999999,48.19643332981063],
             [-107.9296875,48.19643332981063],
             [-107.9296875,32.69746078939034],
-            [-120.23437499999999,32.69746078939034]]]}}""".parseJson.convertTo[Polygon]
+            [-120.23437499999999,32.69746078939034]]]}}""".parseJson.convertTo[Polygon],
+    "USA" -> 
+      """{"type":"Feature","properties":{"name":3},"geometry":{
+          "type":"Polygon",
+          "coordinates":[[
+            [-124.9132294655,25.6804735519],
+            [-124.9132294655,49.2204934537],
+            [-66.6759185791,49.2204934537],
+            [-66.6759185791,25.6804735519],
+            [-124.9132294655,25.6804735519]]]}}""".parseJson.convertTo[Polygon]
   )
 }
 
 object Benchmark extends ArgMain[BenchmarkArgs] with Logging {
   import Extents._
-  val zoom = 8
-  val layer1 = LayerId("pr-rcp26-ccsm4", zoom)
-  val layer2 = LayerId("pr-rcp45-ccsm4", zoom)
   
-
   def zonalSummary(rdd: RasterRDD[SpaceTimeKey], polygon: Polygon) = {
     rdd
       .mapKeys { key => key.updateTemporalComponent(key.temporalKey.time.withMonthOfYear(1).withDayOfMonth(1).withHourOfDay(0)) }
@@ -91,10 +96,11 @@ object Benchmark extends ArgMain[BenchmarkArgs] with Logging {
     val catalog = accumulo.catalog
 
     println("------ Single Model Benchmark ------")
-    for ( (name, polygon) <- extents) {
+    for ( (name, polygon) <- extents.reverse) {
       val (lmd, params) = catalog.metaDataCatalog.load(layers.head)
       val md = lmd.rasterMetaData  
       val bounds = md.mapTransform(polygon.envelope)
+      println(s"BOUNDS: $bounds")
       val rdd1 = catalog.load[SpaceTimeKey](layers.head, FilterSet(SpaceFilter[SpaceTimeKey](bounds))).cache
     
       Timer.timedTask(s"Load $name"){
@@ -105,8 +111,8 @@ object Benchmark extends ArgMain[BenchmarkArgs] with Logging {
         zonalSummary(rdd1, polygon)      
       }
     }
-
-    for ( (name, polygon) <- extents) {
+// TODO: have caliper hit this
+    for ( (name, polygon) <- extents.reverse) {
       Timer.timedTask(s"------ Multi-Model Benchmark ------ : $name") {
         val rdds = layers.map { layer =>
           val (lmd, params) = catalog.metaDataCatalog.load(layer)

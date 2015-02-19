@@ -136,7 +136,6 @@ object TimeRasterAccumuloDriver extends AccumuloDriver[SpaceTimeKey] {
 
             val start = f"${layerId.zoom}%02d_${min}%019d"
             val end   = f"${layerId.zoom}%02d_${max}%019d"
-            println(s"Range: $start - $end")
             val zmin = new Z3(min)
             val zmax = new Z3(max)      
             if (min == max)

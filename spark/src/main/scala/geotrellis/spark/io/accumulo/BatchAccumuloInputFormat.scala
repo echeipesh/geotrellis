@@ -72,8 +72,7 @@ class BatchAccumuloInputFormat extends InputFormatBase[Key, Value] {
 
     val resolveHostname: String => String = 
       Memo.mutableHashMapMemo { ip =>
-          val inetAddress = InetAddress.getByName(ip)
-          inetAddress.getCanonicalHostName()
+          InetAddress.getByName(ip).getCanonicalHostName()
       }
 
     // tserver: String = server:ip for the tablet server

@@ -96,7 +96,7 @@ object TimeRasterAccumuloDriver extends AccumuloDriver[SpaceTimeKey] {
   
   def timeSlugs(filters: List[(DateTime, DateTime)]): List[(Int, Int)] = filters match {
     case Nil =>
-      List(2000 -> 3000)
+      List(2000 -> 2100)
     case List((start, end)) =>                 
       List(timeChunk(start).toInt -> timeChunk(end).toInt)
   }

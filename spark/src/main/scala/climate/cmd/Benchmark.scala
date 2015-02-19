@@ -113,7 +113,7 @@ object Benchmark extends ArgMain[BenchmarkArgs] with Logging {
         val rdd1 = catalog.load[SpaceTimeKey](layers.head, FilterSet(SpaceFilter[SpaceTimeKey](bounds))).cache
       
         Timer.timedTask(s"- Load Tiles"){
-          rdd1.count
+          rdd1.foreachPartition( _ => {})
         }
 
         Timer.timedTask(s"- Zonal Summary Calclutation") {
@@ -134,12 +134,14 @@ object Benchmark extends ArgMain[BenchmarkArgs] with Logging {
           val (lmd, params) = catalog.metaDataCatalog.load(layer)
           val md = lmd.rasterMetaData  
           val bounds = md.mapTransform(polygon.envelope)
-          catalog.load[SpaceTimeKey](layer, FilterSet(SpaceFilter[SpaceTimeKey](bounds))).cache
+          val rdd = catalog.load[SpaceTimeKey](layer, FilterSet(SpaceFilter[SpaceTimeKey](bounds)))
+          rdd.setName(name)
+          rdd.cache
         }
 
         for ((layer, rdd) <- layers zip rdds) {
           Timer.timedTask(s"- Load RDD: $layer"){
-            rdd.count
+            rdd.foreachPartition( _ => {})
           }
         }
 

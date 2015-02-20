@@ -89,6 +89,13 @@ object Benchmark extends ArgMain[BenchmarkArgs] with Logging {
       .sortBy(_._1)
   }
 
+
+  def stats(rdd: RasterRDD[SpaceTimeKey]): String = {
+    val tiles = rdd.count
+    val cells = tiles * rdd.metaData.tileLayout.tileSize
+    s"tiles=$tiles, cells=$cells"    
+  }
+
   def main(args: BenchmarkArgs): Unit = {
     implicit val sparkContext = SparkUtils.createSparkContext("Benchmark")
 
@@ -120,7 +127,6 @@ object Benchmark extends ArgMain[BenchmarkArgs] with Logging {
       }
     }
 
-    // TODO: have caliper hit this
     for { 
       (name, polygon) <- extents
     } {
@@ -151,6 +157,8 @@ object Benchmark extends ArgMain[BenchmarkArgs] with Logging {
             rdds.head.combineTiles(rdds.tail)(local.Mean.apply)
             .foreachPartition(_ => {})
         }
+
+        rdds.foreach(_.unpersist())
       }
     }
   }

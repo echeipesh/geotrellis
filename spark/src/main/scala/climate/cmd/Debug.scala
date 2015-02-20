@@ -45,11 +45,10 @@ object Debug extends ArgMain[BenchmarkArgs] with Logging {
 
     println("------ Single Model Benchmark ------")
     for { 
-      (name, polygon) <- extents if name == "USA"      
-      count <- 1 to 3
+      (name, polygon) <- extents if name == "Rockies"      
+      count <- 1 to 2
     } {
-
-      Timer.timedTask(s"TOTAL Single: $name"){  
+      Timer.timedTask(s"TOTAL Two-State Single: $name"){  
         
         val (lmd, params) = catalog.metaDataCatalog.load(layers.head)
         val md = lmd.rasterMetaData  
@@ -61,12 +60,22 @@ object Debug extends ArgMain[BenchmarkArgs] with Logging {
           rdd1.foreachPartition( _ => {})
         }
 
-        // Timer.timedTask(s"- Zonal Summary Calclutation") {
-        //   zonalSummary(rdd1, polygon)      
-        // }
-
+        Timer.timedTask(s"- Zonal Summary Calclutation") {
+          zonalSummary(rdd1, polygon)      
+        }     
         rdd1.unpersist()
       }
+
+      Timer.timedTask(s"TOTAL One-State Single: $name"){  
+        
+        val (lmd, params) = catalog.metaDataCatalog.load(layers.head)
+        val md = lmd.rasterMetaData  
+        val bounds = md.mapTransform(polygon.envelope)
+        
+        val rdd1 = catalog.load[SpaceTimeKey](layers.head, FilterSet(SpaceFilter[SpaceTimeKey](bounds)))
+      
+        zonalSummary(rdd1, polygon)      
+      } 
     }
   }
 }

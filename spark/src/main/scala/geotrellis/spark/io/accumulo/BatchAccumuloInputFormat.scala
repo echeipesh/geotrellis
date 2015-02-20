@@ -72,17 +72,16 @@ class BatchAccumuloInputFormat extends InputFormatBase[Key, Value] with Logging 
     }
 
     //THIS IS HERE FOR DEBUG: are splits looked up based on internal or external IPs?
-    val fakeMap = Map(
-      "ip-10-0-1-116.ec2.internal" -> "ec2-54-152-83-159.compute-1.amazonaws.com",
-      "ip-10-0-1-115.ec2.internal" -> "ec2-54-152-45-241.compute-1.amazonaws.com",
-      "ip-10-0-1-113.ec2.internal" -> "ec2-54-175-245-27.compute-1.amazonaws.com" 
-      )
+    // val fakeMap = Map(
+    //   "ip-10-0-1-116.ec2.internal" -> "ec2-54-152-83-159.compute-1.amazonaws.com",
+    //   "ip-10-0-1-115.ec2.internal" -> "ec2-54-152-45-241.compute-1.amazonaws.com",
+    //   "ip-10-0-1-113.ec2.internal" -> "ec2-54-175-245-27.compute-1.amazonaws.com" 
+    //   )
 
     
     val resolveHostname: String => String = 
       Memo.mutableHashMapMemo { ip =>
-        val name = InetAddress.getByName(ip).getCanonicalHostName()
-        fakeMap.getOrElse(name, name)
+        InetAddress.getByName(ip).getCanonicalHostName()      
       }
 
     // tserver: String = server:ip for the tablet server

@@ -100,12 +100,8 @@ object Benchmark extends ArgMain[BenchmarkArgs] with Logging {
     println("------ Single Model Benchmark ------")
     for { 
       (name, polygon) <- extents
-      count <- 1 to 3
     } {
-
-
-      Timer.timedTask(s"TOTAL Single: $name"){  
-        
+      Timer.timedTask(s"TOTAL Single: $name"){          
         val (lmd, params) = catalog.metaDataCatalog.load(layers.head)
         val md = lmd.rasterMetaData  
         val bounds = md.mapTransform(polygon.envelope)
@@ -127,9 +123,8 @@ object Benchmark extends ArgMain[BenchmarkArgs] with Logging {
     // TODO: have caliper hit this
     for { 
       (name, polygon) <- extents
-      count <- 1 to 3
     } {
-      Timer.timedTask(s"TTOTAL Multi-Model: $name") {
+      Timer.timedTask(s"TOTAL Multi-Model: $name") {
         val rdds = layers.map { layer =>
           val (lmd, params) = catalog.metaDataCatalog.load(layer)
           val md = lmd.rasterMetaData  

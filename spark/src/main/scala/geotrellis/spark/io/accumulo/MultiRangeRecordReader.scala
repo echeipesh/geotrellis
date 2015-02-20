@@ -19,7 +19,7 @@ class MultiRangeRecordReader extends RecordReader[Key, Value] {
   def initialize(inputSplit: InputSplit, context: TaskAttemptContext): Unit = {    
     val split = inputSplit.asInstanceOf[MultiRangeInputSplit]
     
-    val queryThreads = 1
+    val queryThreads = 24
     val connector = split.connector
     scanner = connector.createBatchScanner(split.table, new Authorizations(), queryThreads);
     scanner.setRanges(split.ranges.asJava)        

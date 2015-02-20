@@ -4,23 +4,28 @@ import org.apache.accumulo.core.client._
 import org.apache.accumulo.core.data._
 import org.apache.accumulo.core.security.Authorizations
 import org.apache.hadoop.mapreduce.{RecordReader, TaskAttemptContext, InputSplit}
+import com.typesafe.scalalogging.slf4j.Logging
 import scala.collection.JavaConverters._
 
 /**
  * It is not clear what would be better, a series of scanners or a BatchScanner.
  * BatchScanner is way easier to code for this, so that's what's happening.
  */
-class MultiRangeRecordReader extends RecordReader[Key, Value] {
+class MultiRangeRecordReader extends RecordReader[Key, Value] with Logging {
   var scanner: BatchScanner = null
   var iterator: Iterator[java.util.Map.Entry[Key, Value]] = null
   var key: Key = null
   var value: Value = null
+  var startTime: Long = 0L
+  var recordsRead: Long = 0
 
   def initialize(inputSplit: InputSplit, context: TaskAttemptContext): Unit = {    
+    startTime = System.currentTimeMillis
     val split = inputSplit.asInstanceOf[MultiRangeInputSplit]
     
     val queryThreads = 24
     val connector = split.connector
+    logger.debug(s"Init location=${split.location}, ranges=${split.ranges.length}")
     scanner = connector.createBatchScanner(split.table, new Authorizations(), queryThreads);
     scanner.setRanges(split.ranges.asJava)        
     split.iterators foreach { scanner.addScanIterator }
@@ -31,6 +36,7 @@ class MultiRangeRecordReader extends RecordReader[Key, Value] {
         scanner.fetchColumnFamily(pair.getFirst)
     }
     iterator = scanner.iterator().asScala
+    logger.debug(s"Init Finish")
   }
 
   def getProgress: Float = 0 //not sure how this is used
@@ -38,6 +44,7 @@ class MultiRangeRecordReader extends RecordReader[Key, Value] {
   def nextKeyValue(): Boolean = {
     val hasNext = iterator.hasNext
     if (hasNext) {
+      recordsRead += 1
       val entry = iterator.next()
       key = entry.getKey
       value = entry.getValue
@@ -50,6 +57,7 @@ class MultiRangeRecordReader extends RecordReader[Key, Value] {
   def getCurrentKey: Key = key
 
   def close(): Unit = {
+    logger.debug(s"Closing: time:${System.currentTimeMillis - startTime}ms recordsRead=$recordsRead")
     scanner.close
   }
 }

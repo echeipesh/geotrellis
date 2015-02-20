@@ -25,18 +25,18 @@ class MultiRangeRecordReader extends RecordReader[Key, Value] with Logging {
     
     val queryThreads = 24
     val connector = split.connector
-    logger.debug(s"Init location=${split.location}, ranges=${split.ranges.length}")
-    scanner = connector.createBatchScanner(split.table, new Authorizations(), queryThreads);
-    scanner.setRanges(split.ranges.asJava)        
-    split.iterators foreach { scanner.addScanIterator }
-    split.fetchedColumns foreach { pair =>  
-      if (pair.getSecond != null)
-        scanner.fetchColumn(pair.getFirst, pair.getSecond) 
-      else 
-        scanner.fetchColumnFamily(pair.getFirst)
+    climate.cmd.Timer.timedTask("Init", str => logger.debug(str)) {
+      scanner = connector.createBatchScanner(split.table, new Authorizations(), queryThreads);
+      scanner.setRanges(split.ranges.asJava)        
+      split.iterators foreach { scanner.addScanIterator }
+      split.fetchedColumns foreach { pair =>  
+        if (pair.getSecond != null)
+          scanner.fetchColumn(pair.getFirst, pair.getSecond) 
+        else 
+          scanner.fetchColumnFamily(pair.getFirst)
+      }
+      iterator = scanner.iterator().asScala
     }
-    iterator = scanner.iterator().asScala
-    logger.debug(s"Init Finish")
   }
 
   def getProgress: Float = 0 //not sure how this is used
@@ -57,7 +57,7 @@ class MultiRangeRecordReader extends RecordReader[Key, Value] with Logging {
   def getCurrentKey: Key = key
 
   def close(): Unit = {
-    logger.debug(s"Closing: time:${System.currentTimeMillis - startTime}ms recordsRead=$recordsRead")
+    logger.debug(s"Closing: ${this.toString}, time:${System.currentTimeMillis - startTime}ms recordsRead=$recordsRead")
     scanner.close
   }
 }

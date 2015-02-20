@@ -17,7 +17,7 @@ import scala.collection.mutable
 import scala.collection.JavaConverters._
 
 class MultiRangeInputSplit extends InputSplit with Writable {
-  var ranges: Seq[ARange] = null
+  var ranges: Seq[ARange] = Seq.empty
   var location: String = null
   var table: String = null
   var instanceName: String = null
@@ -31,6 +31,8 @@ class MultiRangeInputSplit extends InputSplit with Writable {
   var mockInstance: Boolean = false
   var level: Level = Level.INFO
 
+  override def toString: String = 
+    s"MultiRangeInputSplit(location=$location, table=$table, ranges=${ranges.length})"
   
   def instance = 
     if (mockInstance)

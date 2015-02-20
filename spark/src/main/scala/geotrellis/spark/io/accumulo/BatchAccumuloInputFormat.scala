@@ -15,6 +15,7 @@ import org.apache.accumulo.core.security.CredentialHelper
 import org.apache.accumulo.core.util.UtilWaitThread
 import org.apache.hadoop.mapreduce.{RecordReader, TaskAttemptContext, InputSplit, JobContext}
 import scala.collection.JavaConverters._
+import com.typesafe.scalalogging.slf4j.Logging
 import scalaz.Memo
 import java.net.InetAddress
 
@@ -30,7 +31,7 @@ import java.net.InetAddress
  * We borrow some Accumulo machinery to set and read configurations so classOf AccumuloInputFormat should be used 
  * for mudifiying Congiruation, as if AccumuloInputFormat will be used.
  */
-class BatchAccumuloInputFormat extends InputFormatBase[Key, Value] {
+class BatchAccumuloInputFormat extends InputFormatBase[Key, Value] with Logging {
   /** We're going to lie about our class so we can re-use Accumulo InputConfigurator to pull our Job settings */
   private val CLASS: Class[_] = classOf[AccumuloInputFormat]
 
@@ -70,9 +71,18 @@ class BatchAccumuloInputFormat extends InputFormatBase[Key, Value] {
       tabletLocator.invalidateCache()
     }
 
+    //THIS IS HERE FOR DEBUG: are splits looked up based on internal or external IPs?
+    val fakeMap = Map(
+      "ip-10-0-1-116.ec2.internal" -> "ec2-54-152-83-159.compute-1.amazonaws.com",
+      "ip-10-0-1-115.ec2.internal" -> "ec2-54-152-45-241.compute-1.amazonaws.com",
+      "ip-10-0-1-113.ec2.internal" -> "ec2-54-175-245-27.compute-1.amazonaws.com" 
+      )
+
+    
     val resolveHostname: String => String = 
       Memo.mutableHashMapMemo { ip =>
-          InetAddress.getByName(ip).getCanonicalHostName()
+        val name = InetAddress.getByName(ip).getCanonicalHostName()
+        fakeMap.getOrElse(name, name)
       }
 
     // tserver: String = server:ip for the tablet server
@@ -100,7 +110,7 @@ class BatchAccumuloInputFormat extends InputFormatBase[Key, Value] {
           case _: ZooKeeperInstance => split.mockInstance = false
           case _ => sys.error("Unknown instance type")
         }
-
+        logger.debug(s"Produced: $split")
         split: InputSplit
       }
     }

@@ -105,7 +105,7 @@ object Benchmark extends ArgMain[BenchmarkArgs] with Logging {
       .sortBy(_._1)
   }
 
-  def annualAverage(rdd: RasterRDD[SpaceTimeKey]): Seq[(org.joda.time.DateTime.Property, Double)] = {
+  def annualAverage(rdd: RasterRDD[SpaceTimeKey]): Seq[(org.joda.time.DateTime, Double)] = {
     rdd
       .map{ case (key, tile) =>         
         var total: Double = 0
@@ -116,7 +116,7 @@ object Benchmark extends ArgMain[BenchmarkArgs] with Logging {
             count += 1
           }
         }
-        val year = key.temporalComponent.time.year
+        val year = key.updateTemporalComponent(key.temporalKey.time.withMonthOfYear(1).withDayOfMonth(1).withHourOfDay(0)).temporalComponent.time
         year -> (total, count)
       }
       .reduceByKey{ (tup1, tup2) => 

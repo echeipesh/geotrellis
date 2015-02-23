@@ -111,7 +111,7 @@ object Benchmark extends ArgMain[BenchmarkArgs] with Logging {
         var total: Double = 0
         var count = 0L
         tile.foreachDouble{ d => 
-          if(isNoData(d)) {
+          if(! isNoData(d)) {
             total += d
             count += 1
           }

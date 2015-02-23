@@ -21,6 +21,11 @@ import geotrellis.raster.op.zonal.summary._
 import geotrellis.spark.op.stats._
 import com.github.nscala_time.time.Imports._
 import geotrellis.raster.op.local
+import geotrellis.raster._
+import com.typesafe.scalalogging.slf4j.Logging
+import org.apache.spark.SparkContext._
+import com.github.nscala_time.time.Imports._
+import geotrellis.spark.op.local._
 
 class BenchmarkArgs extends AccumuloArgs {
   /** Comma seprated list of layerId:Zoom */
@@ -80,6 +85,17 @@ object Extents extends GeoJsonSupport {
 object Benchmark extends ArgMain[BenchmarkArgs] with Logging {
   import Extents._
   
+  implicit val sparkContext = SparkUtils.createSparkContext("Benchmark")
+
+  def getRdd(catalog: AccumuloCatalog, id: LayerId, polygon: Polygon, name: String): RasterRDD[SpaceTimeKey] = {
+    val (lmd, params) = catalog.metaDataCatalog.load(id)
+    val md = lmd.rasterMetaData  
+    val bounds = md.mapTransform(polygon.envelope)        
+    val rdd = catalog.load[SpaceTimeKey](id, FilterSet(SpaceFilter[SpaceTimeKey](bounds)))
+    rdd.setName(name)
+    rdd
+  }
+
   def zonalSummary(rdd: RasterRDD[SpaceTimeKey], polygon: Polygon) = {
     rdd
       .mapKeys { key => key.updateTemporalComponent(key.temporalKey.time.withMonthOfYear(1).withDayOfMonth(1).withHourOfDay(0)) }
@@ -89,76 +105,80 @@ object Benchmark extends ArgMain[BenchmarkArgs] with Logging {
       .sortBy(_._1)
   }
 
-
-  def stats(rdd: RasterRDD[SpaceTimeKey]): String = {
-    val tiles = rdd.count
-    val cells = tiles * rdd.metaData.tileLayout.tileSize
-    s"tiles=$tiles, cells=$cells"    
+  def annualAverage(rdd: RasterRDD[SpaceTimeKey]): Seq[(org.joda.time.DateTime.Property, Double)] = {
+    rdd
+      .map{ case (key, tile) =>         
+        var total: Double = 0
+        var count = 0L
+        tile.foreachDouble{ d => 
+          if(isNoData(d)) {
+            total += d
+            count += 1
+          }
+        }
+        val year = key.temporalComponent.time.year
+        year -> (total, count)
+      }
+      .reduceByKey{ (tup1, tup2) => 
+        (tup1._1 + tup2._1) -> (tup1._2 + tup2._2)
+      }
+      .collect
+      .map{ case (year, (sum, count)) => 
+        year -> sum/count 
+      }
   }
 
+  def stats(rdd: RasterRDD[SpaceTimeKey]): String = {
+    val crdd = rdd.cache()
+    val tiles = rdd.count
+    val cells = tiles * rdd.metaData.tileLayout.tileSize
+    crdd.unpersist()
+    s"tiles=$tiles, cells=$cells"
+  }
+
+
   def main(args: BenchmarkArgs): Unit = {
-    implicit val sparkContext = SparkUtils.createSparkContext("Benchmark")
-
-    val layers = args.getLayers
-
     val accumulo = AccumuloInstance(args.instance, args.zookeeper, args.user, new PasswordToken(args.password))
     val catalog = accumulo.catalog
 
-    println("------ Single Model Benchmark ------")
+    val layers = args.getLayers
+
     for { 
       (name, polygon) <- extents
+      count <- 1 to (if (name == "philadelphia") 4 else 1)
     } {
-      Timer.timedTask(s"TOTAL Single: $name"){          
-        val (lmd, params) = catalog.metaDataCatalog.load(layers.head)
-        val md = lmd.rasterMetaData  
-        val bounds = md.mapTransform(polygon.envelope)
-        
-        val rdd1 = catalog.load[SpaceTimeKey](layers.head, FilterSet(SpaceFilter[SpaceTimeKey](bounds))).cache
-      
-        Timer.timedTask(s"- Load Tiles"){
-          rdd1.foreachPartition( _ => {})
-        }
+      val rdd = getRdd(catalog, layers.head, polygon, name)
+    
+      Timer.timedTask(s"Single: $name - Load and Cache Tiles", s => logger.info(s)){        
+        logger.info("Stats: $name = (${stats(crdd)})")        
+      }
 
-        Timer.timedTask(s"- Zonal Summary Calclutation") {
-          zonalSummary(rdd1, polygon)      
-        }
-
-        rdd1.unpersist()
+      Timer.timedTask(s"Single: $name - zonalSummary", s => logger.info(s)) {
+        zonalSummary(rdd, polygon)      
       }
     }
 
     for { 
       (name, polygon) <- extents
-    } {
-      Timer.timedTask(s"TOTAL Multi-Model: $name") {
-        val rdds = layers.map { layer =>
-          val (lmd, params) = catalog.metaDataCatalog.load(layer)
-          val md = lmd.rasterMetaData  
-          val bounds = md.mapTransform(polygon.envelope)
-          val rdd = catalog.load[SpaceTimeKey](layer, FilterSet(SpaceFilter[SpaceTimeKey](bounds)))
-          rdd.setName(name)
-          rdd.cache
-        }
+    } {    
+      val rdds = layers.map { layer => getRdd(catalog, layer, polygon, name)}
 
-        for ((layer, rdd) <- layers zip rdds) {
-          Timer.timedTask(s"- Load RDD: $layer"){
-            rdd.foreachPartition( _ => {})
-          }
-        }
+      Timer.timedTask(s"Multi-Model $name .averageByKey for: ${layers.toList}", s => logger.info(s)) {
+        new RasterRDD[SpaceTimeKey](rdds.reduce(_ union _), rdds.head.metaData)
+          .averageByKey
+          .foreachPartition(_ => {})
+      }
 
-        Timer.timedTask(s"- average with .averageByKey for: ${layers.toList}") {
-          new RasterRDD[SpaceTimeKey](rdds.reduce(_ union _), rdds.head.metaData)
-            .averageByKey
-            .foreachPartition(_ => {})
-        }
+      Timer.timedTask(s"Multi-Model $name .combineTiles(local.Mean.apply) for: ${layers.toList}", s => logger.info(s)) {
+        new RasterRDD[SpaceTimeKey](rdds.reduce(_ union _), rdds.head.metaData)
+          rdds.head.combineTiles(rdds.tail)(local.Mean.apply)
+          .foreachPartition(_ => {})
+      }
 
-        Timer.timedTask(s"- average with union for: ${layers.toList}") {
-          new RasterRDD[SpaceTimeKey](rdds.reduce(_ union _), rdds.head.metaData)
-            rdds.head.combineTiles(rdds.tail)(local.Mean.apply)
-            .foreachPartition(_ => {})
-        }
-
-        rdds.foreach(_.unpersist())
+      Timer.timedTask(s"Multi-Model $name annual average difference by year", s => logger.info(s)) {
+        val diff:RasterRDD[SpaceTimeKey] = rdds(1) localSubtract rdds(0)
+        val aadiff = annualAverage(diff)
+        logger.info(s"Annual average difference: $aadiff")
       }
     }
   }

@@ -17,9 +17,10 @@ import org.apache.spark._
 import com.quantifind.sumac.ArgMain
 import com.github.nscala_time.time.Imports._
 import com.typesafe.scalalogging.slf4j.Logging
+import com.quantifind.sumac.validation.Required
 
 class NexIngestArgs extends AccumuloIngestArgs {
-  var s3PageSize: Integer = 500
+  @Required var s3PageSize: Integer = 500
 } 
 
 /** Ingests the chunked NEX GeoTIFF data */

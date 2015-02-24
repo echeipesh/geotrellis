@@ -181,7 +181,8 @@ trait AccumuloDriver[K] extends Serializable {
     val failuresPath = outPath.suffix("-failures")
     
     try {
-      HdfsUtils.ensurePathExists(outPath, conf)
+      // this directory needs to not exist, will be created by AFOF
+      //HdfsUtils.ensurePathExists(outPath, conf)
       HdfsUtils.ensurePathExists(failuresPath, conf)
 
       raster                

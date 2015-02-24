@@ -18,9 +18,13 @@ import com.quantifind.sumac.ArgMain
 import com.github.nscala_time.time.Imports._
 import com.typesafe.scalalogging.slf4j.Logging
 
+class NexIngestArgs extends AccumuloIngestArgs {
+  var s3PageSize: Integer = 500
+} 
+
 /** Ingests the chunked NEX GeoTIFF data */
-object NEXIngest extends ArgMain[AccumuloIngestArgs] with Logging {
-  def main(args: AccumuloIngestArgs): Unit = {
+object NEXIngest extends ArgMain[NexIngestArgs] with Logging {
+  def main(args: NexIngestArgs): Unit = {
     System.setProperty("com.sun.media.jai.disableMediaLib", "true")
 
     implicit val sparkContext = SparkUtils.createSparkContext("Ingest")
@@ -36,7 +40,7 @@ object NEXIngest extends ArgMain[AccumuloIngestArgs] with Logging {
     // Get source tiles
     val inPath = args.inPath
     S3InputFormat.setUrl(job, inPath.toUri.toString)
-
+    S3InputFormat.setMaxKeys(job, args.s3PageSize)
     val source = 
       sparkContext.newAPIHadoopRDD(
         job.getConfiguration,

@@ -20,7 +20,7 @@ import com.typesafe.scalalogging.slf4j.Logging
 import com.quantifind.sumac.validation.Required
 
 class NexIngestArgs extends AccumuloIngestArgs {
-  @Required var s3PageSize: Integer = 500
+  @Required var s3PageSize: Integer = _
 } 
 
 /** Ingests the chunked NEX GeoTIFF data */

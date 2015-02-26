@@ -145,7 +145,7 @@ object Benchmark extends ArgMain[BenchmarkArgs] with Logging {
 
     for { 
       (name, polygon) <- extents
-      count <- 1 to 4)
+      count <- 1 to 4
     } {
       val rdd = getRdd(catalog, layers.head, polygon, name)
     

@@ -199,9 +199,10 @@ trait AccumuloDriver[K] extends Serializable {
 
     rdd
       .map { case (key, _) => rowId(id, key) -> null }
-      .sortByKey(ascending = true, numPartitions = num)
+      .sortByKey(ascending = true, numPartitions = num+1)
       .map(_._1)
       .mapPartitions{ iter => iter.take(1) }
       .collect
+      .tail // disregard the first partition
   }
 }

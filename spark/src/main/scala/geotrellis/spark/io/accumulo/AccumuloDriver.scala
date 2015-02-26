@@ -101,7 +101,7 @@ trait AccumuloDriver[K] extends Serializable {
     mutations.saveAsNewAPIHadoopFile(accumulo.instanceName, classOf[Text], classOf[Mutation], classOf[AccumuloOutputFormat], job.getConfiguration)
   }
 
-  def saveWithHistogram(sc: SparkContext, accumulo: AccumuloInstance)(id: LayerId, raster: RasterRDD[K], table: String, clobber: Boolean): Unit = {
+  def save(sc: SparkContext, accumulo: AccumuloInstance)(id: LayerId, raster: RasterRDD[K], table: String, clobber: Boolean): Unit = {
     val connector = accumulo.connector    
     val ops = connector.tableOperations()  
     if (! ops.exists(table))  ops.create(table)
@@ -120,6 +120,7 @@ trait AccumuloDriver[K] extends Serializable {
     
     val rddHist = 
     raster.mapPartitions{ pairs =>
+      val partitionCon = bcCon.value
       val partitionHist = FastMapHistogram() 
       var rows = Map.empty[String, List[(Key, Tile)]]
 
@@ -132,29 +133,29 @@ trait AccumuloDriver[K] extends Serializable {
         rows = rows.updated(rid, rowKey -> tile :: list)
       }
 
-      val writer = bcCon.value.createBatchWriter(table, 
+      val writerConfig = 
         new BatchWriterConfig()
           .setMaxMemory(4*1024*1024) 
           .setMaxWriteThreads(24)
-          .setMaxLatency(5, TimeUnit.SECONDS))
+          .setMaxLatency(2, TimeUnit.SECONDS)
   
       //We've just taken a lot of memory converting all the tiles to bites
       // there does not seem to be an expidient way to avoid it    
-      var counter = 0
-      rows.foreach { case (rid, list) => 
-        val mut = new Mutation(rid)
-        list.foreach { case (rowKey, tile) =>
-          mut.put(rowKey.getColumnFamily, rowKey.getColumnQualifier, 
-            System.currentTimeMillis(), new Value(tile.toBytes))
+      rows.sliding(100,100).foreach { rowSlice =>
+        val writer = partitionCon.createBatchWriter(table, writerConfig)
+
+        rowSlice.foreach{ case (rid, list) => 
+          val mut = new Mutation(rid)
+          list.foreach { case (rowKey, tile) =>
+            mut.put(rowKey.getColumnFamily, rowKey.getColumnQualifier, 
+              System.currentTimeMillis(), new Value(tile.toBytes))
+          }
+          writer.addMutation(mut)          
         }
-        writer.addMutation(mut)
-        
-        //Lets try to clear the pipes a little and stave off overflows
-        counter += 1
-        counter %= 100
-        if (counter == 0) writer.flush()
+
+        writer.close()  
       }      
-      writer.close()
+      
       Iterator(partitionHist)
     }
     .collect
@@ -165,7 +166,7 @@ trait AccumuloDriver[K] extends Serializable {
   }
 
   /** NOTE: Accumulo will always perform destructive update, clobber param is not followed */
-  def save(sc: SparkContext, accumulo: AccumuloInstance)(id: LayerId, raster: RasterRDD[K], table: String, clobber: Boolean): Unit = {
+  def saveToFs(sc: SparkContext, accumulo: AccumuloInstance)(id: LayerId, raster: RasterRDD[K], table: String, clobber: Boolean): Unit = {
     val connector = accumulo.connector    
     val ops = connector.tableOperations()  
     if (! ops.exists(table))  ops.create(table)

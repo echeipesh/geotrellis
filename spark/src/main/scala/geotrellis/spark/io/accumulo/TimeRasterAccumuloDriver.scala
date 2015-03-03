@@ -23,6 +23,10 @@ object TimeRasterAccumuloDriver extends AccumuloDriver[SpaceTimeKey] {
   def timeChunk(time: DateTime): String =
     time.getYear.toString
 
+  def rowId(z: Z3): String = {
+    ???
+  }
+
   def rowId(id: LayerId, key: SpaceTimeKey): String = {
     val SpaceTimeKey(SpatialKey(col, row), TemporalKey(time)) = key
     val t = timeChunk(time).toInt
@@ -35,6 +39,50 @@ object TimeRasterAccumuloDriver extends AccumuloDriver[SpaceTimeKey] {
 
   def timeText(key: SpaceTimeKey): Text = 
     new Text(key.temporalKey.time.withZone(DateTimeZone.UTC).toString)
+
+  def getSplits(metaData: RasterMetaData, num: Int): List[String] = {
+    val bounds = metaData.mapTransform(metaData.extent)
+    // TODO: This information needs to come from RMD, which probably needs to vary with K, ya?
+    val yearMin = 2000
+    val yearMax  = 2100
+    val zMin = Z3(bounds.colMin, bounds.rowMin, yearMin)
+    val zMax = Z3(bounds.colMax, bounds.rowMax, yearMax)
+    val ranges: Seq[(Long, Long)] = Z3.zranges(zMin, zMax)
+    val totalSize = (yearMax - yearMin + 1) * (bounds.colMax - bounds.colMin + 1) * (bounds.rowMax - bounds.rowMin + 1)
+    val splitSize = totalSize / num
+    // now I just need to separate the things into bins
+     
+    def doSplits(ranges: Seq[(Long, Long)]): List[String] = {
+      var total: Long = 0
+      var split: Int = 1
+      var splits: List[String] = Nil
+      val splitSize = 5
+      for ((min, max) <- ranges) {
+        total += (max - min + 1)
+        if (splitSize * split < total) {
+          split += 1
+          splits ::= Z3(max + 1).toString // TODO: Is there fencepost here? Is split inclusive on the left or right?        
+        }
+      }
+      
+      splits
+    }
+
+
+    var total: Long = 0
+    var split: Int = 1
+    var splits: List[String] = Nil
+    for ((min, max) <- ranges) {
+      total += (max - min + 1)
+      if (splitSize * split < total) {
+        split += 1
+        splits ::= rowId(Z3(max + 1)) // TODO: Is there fencepost here? Is split inclusive on the left or right?        
+      }
+    }
+
+    splits
+  }
+
 
   /** Map rdd of indexed tiles to tuples of (table name, row mutation) */
   def encode(layerId: LayerId, raster: RasterRDD[SpaceTimeKey]): RDD[(Text, Mutation)] = {

@@ -22,6 +22,7 @@ object RasterAccumuloDriver extends AccumuloDriver[SpatialKey] {
   }
   
   def getKey(id: LayerId, key: SpatialKey) = ??? 
+  def getSplits(id: LayerId, metaData: RasterMetaData, num: Int = 48): List[String] = ???
 
   def encode(layerId: LayerId, raster: RasterRDD[SpatialKey]): RDD[(Text, Mutation)] =
     raster.map { case (key, tile) =>

@@ -23,15 +23,13 @@ object TimeRasterAccumuloDriver extends AccumuloDriver[SpaceTimeKey] {
   def timeChunk(time: DateTime): String =
     time.getYear.toString
 
-  def rowId(z: Z3): String = {
-    ???
-  }
+  def rowId(id: LayerId, zindex: Z3): String =
+    f"${id.zoom}%02d_${zindex.z}%019d"
 
   def rowId(id: LayerId, key: SpaceTimeKey): String = {
     val SpaceTimeKey(SpatialKey(col, row), TemporalKey(time)) = key
     val t = timeChunk(time).toInt
-    val zindex = Z3(col, row, t)    
-    f"${id.zoom}%02d_${zindex.z}%019d"
+    rowId(id, Z3(col, row, t))
   }
 
   def getKey(id: LayerId, key: SpaceTimeKey): Key = 
@@ -40,7 +38,7 @@ object TimeRasterAccumuloDriver extends AccumuloDriver[SpaceTimeKey] {
   def timeText(key: SpaceTimeKey): Text = 
     new Text(key.temporalKey.time.withZone(DateTimeZone.UTC).toString)
 
-  def getSplits(metaData: RasterMetaData, num: Int): List[String] = {
+  def getSplits(id: LayerId, metaData: RasterMetaData, num: Int): List[String] = {
     val bounds = metaData.mapTransform(metaData.extent)
     // TODO: This information needs to come from RMD, which probably needs to vary with K, ya?
     val yearMin = 2000
@@ -51,23 +49,6 @@ object TimeRasterAccumuloDriver extends AccumuloDriver[SpaceTimeKey] {
     val totalSize = (yearMax - yearMin + 1) * (bounds.colMax - bounds.colMin + 1) * (bounds.rowMax - bounds.rowMin + 1)
     val splitSize = totalSize / num
     // now I just need to separate the things into bins
-     
-    def doSplits(ranges: Seq[(Long, Long)]): List[String] = {
-      var total: Long = 0
-      var split: Int = 1
-      var splits: List[String] = Nil
-      val splitSize = 5
-      for ((min, max) <- ranges) {
-        total += (max - min + 1)
-        if (splitSize * split < total) {
-          split += 1
-          splits ::= Z3(max + 1).toString // TODO: Is there fencepost here? Is split inclusive on the left or right?        
-        }
-      }
-      
-      splits
-    }
-
 
     var total: Long = 0
     var split: Int = 1
@@ -76,7 +57,7 @@ object TimeRasterAccumuloDriver extends AccumuloDriver[SpaceTimeKey] {
       total += (max - min + 1)
       if (splitSize * split < total) {
         split += 1
-        splits ::= rowId(Z3(max + 1)) // TODO: Is there fencepost here? Is split inclusive on the left or right?        
+        splits ::= rowId(id, Z3(max + 1)) // TODO: Is there fencepost here? Is split inclusive on the left or right?        
       }
     }
 

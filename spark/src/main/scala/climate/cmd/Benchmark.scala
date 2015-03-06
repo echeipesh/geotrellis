@@ -149,7 +149,7 @@ object Benchmark extends ArgMain[BenchmarkArgs] with Logging {
     } {
       val rdd = getRdd(catalog, layers.head, polygon, name)
     
-      Timer.timedTask(s"Single: $name - Load and Cache Tiles", s => logger.info(s)){        
+      Timer.timedTask(s"""Benchmark: {type: LoadTiles, name: $name}""", s => logger.info(s)){        
         logger.info(s"Stats: $name = (${stats(rdd)})")        
       }
 

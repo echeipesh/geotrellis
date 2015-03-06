@@ -59,7 +59,7 @@ trait AccumuloDriver[K] extends Serializable {
     val job = Job.getInstance(sc.hadoopConfiguration)
     val conf = job.getConfiguration    
 
-    val splits = getSplits(id, raster)
+    val splits = getSplits(id, raster.metaData)    
     ops.addSplits(table, new java.util.TreeSet(splits.map(new Text(_))))
 
     val bcCon = sc.broadcast(connector)
@@ -113,7 +113,7 @@ trait AccumuloDriver[K] extends Serializable {
     val job = Job.getInstance(sc.hadoopConfiguration)
     val conf = job.getConfiguration    
 
-    val splits = getSplits(id, raster)
+    val splits = getSplits(id, raster.metaData)
     ops.addSplits(table, new java.util.TreeSet(splits.map(new Text(_))))
 
     val bcCon = sc.broadcast(connector)
@@ -194,15 +194,17 @@ trait AccumuloDriver[K] extends Serializable {
     } 
   }
 
- def getSplits(id: LayerId, rdd: RasterRDD[K], num: Int = 24): Seq[String] = {
-    import org.apache.spark.SparkContext._
+  def getSplits(id: LayerId, metaData: RasterMetaData, num: Int = 48): List[String]
 
-    rdd
-      .map { case (key, _) => rowId(id, key) -> null }
-      .sortByKey(ascending = true, numPartitions = num+1)
-      .map(_._1)
-      .mapPartitions{ iter => iter.take(1) }
-      .collect
-      .tail // disregard the first partition
-  }
+//   def getSplits(id: LayerId, rdd: RasterRDD[K], num: Int = 24): Seq[String] = {
+//     import org.apache.spark.SparkContext._
+
+//     rdd
+//       .map { case (key, _) => rowId(id, key) -> null }
+//       .sortByKey(ascending = true, numPartitions = num+1)
+//       .map(_._1)
+//       .mapPartitions{ iter => iter.take(1) }
+//       .collect
+//       .tail // disregard the first partition
+//   }
 }

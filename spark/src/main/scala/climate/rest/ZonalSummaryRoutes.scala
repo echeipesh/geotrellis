@@ -21,45 +21,56 @@ trait ZonalSummaryRoutes { self: HttpService with CorsSupport =>
   import spray.httpx.SprayJsonSupport._  
   import GeoJsonSupport._
 
+  def loadLayer(catalog: AccumuloCatalog, layer: LayerId, poly: Polygon): (Polygon, RasterRDD[SpaceTimeKey]) = {
+    val (lmd, params) = catalog.metaDataCatalog.load(layer)
+    val md = lmd.rasterMetaData
+    val polygon = poly.reproject(LatLng, md.crs)
+    val bounds = md.mapTransform(polygon.envelope)
+    polygon -> catalog.load[SpaceTimeKey](layer, FilterSet(SpaceFilter[SpaceTimeKey](bounds)))
+  }
+
   def zonalRoutes(catalog: AccumuloCatalog) = cors {
     options{
       complete(StatusCodes.OK)
     } ~
-    (pathPrefix(Segment / IntNumber) & (post) ) { (name, zoom) =>      
+    (pathPrefix(Segment / IntNumber) & (post) ) { (names, zoom) =>      
       import DefaultJsonProtocol._ 
       import org.apache.spark.SparkContext._        
-      
-      val layer = LayerId(name, zoom)      
-      val (lmd, params) = catalog.metaDataCatalog.load(layer)
-      val md = lmd.rasterMetaData  
-      
+
       entity(as[Polygon]) { poly => 
-        val polygon = poly.reproject(LatLng, md.crs)
-        val bounds = md.mapTransform(polygon.envelope)
-        val tiles = catalog.load[SpaceTimeKey](layer, FilterSet(SpaceFilter[SpaceTimeKey](bounds)))
-      
+        val layers = names.split(",").map { name =>
+          name -> loadLayer(catalog, LayerId(name, zoom), poly)
+        }
+
         path("min") { 
           complete {    
             val instance = catalog.instance.instance
-            val ret = statsReponse(name,
-              tiles
-              .mapKeys { key => key.updateTemporalComponent(key.temporalKey.time.withMonthOfYear(1).withDayOfMonth(1).withHourOfDay(0)) }
-              .averageByKey
-              .zonalSummaryByKey(polygon, Double.MaxValue, MinDouble, stk => stk.temporalComponent.time)
-              .collect
-              .sortBy(_._1) )
+            val ret = JsArray(layers.map { case (name, (polygon, tiles)) => 
+              statsReponse(name,
+                tiles
+                .mapKeys { key => key.updateTemporalComponent(key.temporalKey.time.withMonthOfYear(1).withDayOfMonth(1).withHourOfDay(0)) }
+                .averageByKey
+                .zonalSummaryByKey(polygon, Double.MaxValue, MinDouble, stk => stk.temporalComponent.time)
+                .collect
+                .sortBy(_._1) )
+            }.toList)
             ret
           } 
         } ~          
         path("max") { 
           complete {    
-            statsReponse(name,
-              tiles
-              .mapKeys { key => key.updateTemporalComponent(key.temporalKey.time.withMonthOfYear(1).withDayOfMonth(1).withHourOfDay(0)) }
-              .averageByKey
-              .zonalSummaryByKey(polygon, Double.MinValue, MaxDouble, stk => stk.temporalComponent.time)
-              .collect
-              .sortBy(_._1) )
+            import geotrellis.raster.op.local._
+            val ret = JsArray(layers.map { case (name, (polygon, tiles)) => 
+              statsReponse(name,
+                tiles
+                .mapKeys { key => key.updateTemporalComponent(key.temporalKey.time.withMonthOfYear(1).withDayOfMonth(1).withHourOfDay(0)) }
+                .reduceByKey(_ localMax _)
+                //.averageByKey
+                .zonalSummaryByKey(polygon, Double.MinValue, MaxDouble, stk => stk.temporalComponent.time)
+                .collect
+                .sortBy(_._1) )
+              }.toList)
+            ret
           } 
         }          
 
@@ -96,7 +107,7 @@ object ZonalSummaryRoutes {
   )
 
   def statsReponse(model: String, data: Seq[(DateTime, Double)]) =  
-    JsArray(JsObject(
+    JsObject(
       "model" -> JsString(model),
       "data" -> JsArray(
         data.map { case (date, value) =>
@@ -107,5 +118,5 @@ object ZonalSummaryRoutes {
             "max" -> JsNumber(value * (1 - scala.util.Random.nextDouble/3))
           )
         }: _*)
-    ))
+    )
 }

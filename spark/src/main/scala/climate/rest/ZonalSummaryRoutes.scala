@@ -64,8 +64,8 @@ trait ZonalSummaryRoutes { self: HttpService with CorsSupport =>
               statsReponse(name,
                 tiles
                 .mapKeys { key => key.updateTemporalComponent(key.temporalKey.time.withMonthOfYear(1).withDayOfMonth(1).withHourOfDay(0)) }
-                .reduceByKey(_ localMax _)
-                //.averageByKey
+                //.reduceByKey(_ localMax _)
+                .averageByKey
                 .zonalSummaryByKey(polygon, Double.MinValue, MaxDouble, stk => stk.temporalComponent.time)
                 .collect
                 .sortBy(_._1) )

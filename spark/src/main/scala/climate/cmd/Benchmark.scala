@@ -51,7 +51,7 @@ object Extents extends GeoJsonSupport {
           [-75.2947998046875,40.04023218690448],
           [-74.9432373046875,40.04023218690448],
           [-74.9432373046875,39.863371338285305],
-          [-75.2947998046875,39.863371338285305]]]}}""".parseJson.convertTo[Polygon].reproject(LatLng, WebMercator),
+          [-75.2947998046875,39.863371338285305]]]}}""".parseJson.convertTo[Polygon],
     "eastKansas" ->
       """{"type":"Feature","properties":{"name":9},"geometry":{
           "type":"Polygon",
@@ -60,7 +60,7 @@ object Extents extends GeoJsonSupport {
             [-98.26171875,39.9434364619742],
             [-94.6142578125,39.9434364619742],
             [-94.6142578125,37.055177106660814],
-            [-98.26171875,37.055177106660814]]]}}""".parseJson.convertTo[Polygon].reproject(LatLng, WebMercator),
+            [-98.26171875,37.055177106660814]]]}}""".parseJson.convertTo[Polygon],
     "Rockies" -> 
       """{"type":"Feature","properties":{"name":3},"geometry":{
           "type":"Polygon",
@@ -69,7 +69,7 @@ object Extents extends GeoJsonSupport {
             [-120.23437499999999,48.19643332981063],
             [-107.9296875,48.19643332981063],
             [-107.9296875,32.69746078939034],
-            [-120.23437499999999,32.69746078939034]]]}}""".parseJson.convertTo[Polygon].reproject(LatLng, WebMercator),
+            [-120.23437499999999,32.69746078939034]]]}}""".parseJson.convertTo[Polygon],
     "USA" -> 
       """{"type":"Feature","properties":{"name":3},"geometry":{
           "type":"Polygon",
@@ -78,7 +78,7 @@ object Extents extends GeoJsonSupport {
             [-124.9132294655,49.2204934537],
             [-66.6759185791,49.2204934537],
             [-66.6759185791,25.6804735519],
-            [-124.9132294655,25.6804735519]]]}}""".parseJson.convertTo[Polygon].reproject(LatLng, WebMercator)
+            [-124.9132294655,25.6804735519]]]}}""".parseJson.convertTo[Polygon]
   )
 }
 
@@ -140,19 +140,15 @@ object Benchmark extends ArgMain[BenchmarkArgs] with Logging {
   def main(args: BenchmarkArgs): Unit = {
     val accumulo = AccumuloInstance(args.instance, args.zookeeper, args.user, new PasswordToken(args.password))
     val catalog = accumulo.catalog
-    println("WORLD")
     val layers = args.getLayers
-    println("HELLO")
     for { 
       (name, polygon) <- extents
       count <- 1 to 4
     } {
-      println(s"""Benchmark: {type: LoadTiles, name: $name} BEFORE""")
       val rdd = getRdd(catalog, layers.head, polygon, name)
-      println(s"""Benchmark: {type: LoadTiles, name: $name} TEST""")
-      // Timer.timedTask(s"""Benchmark: {type: LoadTiles, name: $name}""", s => logger.info(s)){        
-      //   logger.info(s"Stats: $name = (${stats(rdd)})")        
-      // }
+      Timer.timedTask(s"""Benchmark: {type: LoadTiles, name: $name}""", s => logger.info(s)){        
+        logger.info(s"Stats: $name = (${stats(rdd)})")        
+      }
 
       Timer.timedTask(s"""Benchmark: {type: AnnualZonalSummary, name: $name}""", s => logger.info(s)) {
         zonalSummary(rdd, polygon)      

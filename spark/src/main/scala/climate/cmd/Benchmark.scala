@@ -153,7 +153,7 @@ object Benchmark extends ArgMain[BenchmarkArgs] with Logging {
         logger.info(s"Stats: $name = (${stats(rdd)})")        
       }
 
-      Timer.timedTask(s"Single: $name - zonalSummary", s => logger.info(s)) {
+      Timer.timedTask(s"""Benchmark: {type: AnnualZonalSummary, name: $name}""", s => logger.info(s)) {
         zonalSummary(rdd, polygon)      
       }
     }
@@ -162,23 +162,22 @@ object Benchmark extends ArgMain[BenchmarkArgs] with Logging {
       (name, polygon) <- extents
     } {    
       val rdds = layers.map { layer => getRdd(catalog, layer, polygon, name)}
-
-      Timer.timedTask(s"Multi-Model $name .averageByKey for: ${layers.toList}", s => logger.info(s)) {
+      
+      Timer.timedTask(s"""Benchmark: {type: MultiModel-averageByKey, name: $name, layers: ${layers.toList}}""", s => logger.info(s)) {
         new RasterRDD[SpaceTimeKey](rdds.reduce(_ union _), rdds.head.metaData)
           .averageByKey
           .foreachPartition(_ => {})
       }
-
-      Timer.timedTask(s"Multi-Model $name .combineTiles(local.Mean.apply) for: ${layers.toList}", s => logger.info(s)) {
+      
+      Timer.timedTask(s"""Benchmark: {type: MultiModel-combineTiles(local.Mean), name: $name, layers: ${layers.toList}}""", s => logger.info(s)) {
         new RasterRDD[SpaceTimeKey](rdds.reduce(_ union _), rdds.head.metaData)
           rdds.head.combineTiles(rdds.tail)(local.Mean.apply)
           .foreachPartition(_ => {})
       }
 
-      Timer.timedTask(s"Multi-Model $name annual average difference by year", s => logger.info(s)) {
+      Timer.timedTask(s"""Benchmark: {type: MultiModel-localSubtract, name: $name, layers: ${layers.toList}}""", s => logger.info(s)) {
         val diff:RasterRDD[SpaceTimeKey] = rdds(1) localSubtract rdds(0)
-        val aadiff = annualAverage(diff)
-        logger.info(s"Annual average difference: $aadiff")
+        diff.foreachPartition(_ => {})        
       }
     }
   }

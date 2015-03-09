@@ -140,9 +140,9 @@ object Benchmark extends ArgMain[BenchmarkArgs] with Logging {
   def main(args: BenchmarkArgs): Unit = {
     val accumulo = AccumuloInstance(args.instance, args.zookeeper, args.user, new PasswordToken(args.password))
     val catalog = accumulo.catalog
-
+    println("WORLD")
     val layers = args.getLayers
-
+    println("HELLO")
     for { 
       (name, polygon) <- extents
       count <- 1 to 4

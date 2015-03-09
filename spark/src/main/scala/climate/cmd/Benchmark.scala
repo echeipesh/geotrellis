@@ -147,6 +147,7 @@ object Benchmark extends ArgMain[BenchmarkArgs] with Logging {
       (name, polygon) <- extents
       count <- 1 to 4
     } {
+      println(s"""Benchmark: {type: LoadTiles, name: $name} BEFORE""")
       val rdd = getRdd(catalog, layers.head, polygon, name)
       println(s"""Benchmark: {type: LoadTiles, name: $name} TEST""")
       Timer.timedTask(s"""Benchmark: {type: LoadTiles, name: $name}""", s => logger.info(s)){        

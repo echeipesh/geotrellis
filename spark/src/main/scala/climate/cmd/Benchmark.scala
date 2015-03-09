@@ -150,9 +150,9 @@ object Benchmark extends ArgMain[BenchmarkArgs] with Logging {
       println(s"""Benchmark: {type: LoadTiles, name: $name} BEFORE""")
       val rdd = getRdd(catalog, layers.head, polygon, name)
       println(s"""Benchmark: {type: LoadTiles, name: $name} TEST""")
-      Timer.timedTask(s"""Benchmark: {type: LoadTiles, name: $name}""", s => logger.info(s)){        
-        logger.info(s"Stats: $name = (${stats(rdd)})")        
-      }
+      // Timer.timedTask(s"""Benchmark: {type: LoadTiles, name: $name}""", s => logger.info(s)){        
+      //   logger.info(s"Stats: $name = (${stats(rdd)})")        
+      // }
 
       Timer.timedTask(s"""Benchmark: {type: AnnualZonalSummary, name: $name}""", s => logger.info(s)) {
         zonalSummary(rdd, polygon)      

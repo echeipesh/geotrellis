@@ -13,6 +13,7 @@ import geotrellis.vector.Extent
 import org.apache.accumulo.core.client.security.tokens.PasswordToken
 import org.apache.hadoop.fs.Path
 import org.apache.spark._
+import geotrellis.index.zcurve._
 
 class CalculateArgs extends AccumuloArgs {
   @Required var inputLayer: String = _
@@ -22,19 +23,28 @@ class CalculateArgs extends AccumuloArgs {
 /**
  * Ingests raw multi-band NetCDF tiles into a re-projected and tiled RasterRDD
  */
-object Calculate extends ArgMain[CalculateArgs] with Logging {
-  def main(args: CalculateArgs): Unit = {
+object Calculate extends ArgMain[BenchmarkArgs] with Logging {
+  def main(args: BenchmarkArgs): Unit = {
     implicit val sparkContext = SparkUtils.createSparkContext("Calculate")
+    val accumulo = AccumuloInstance(args.instance, args.zookeeper, args.user, new PasswordToken(args.password))
+    val catalog = accumulo.catalog
+    val layer = args.getLayers.head
 
-    // val accumulo = AccumuloInstance(args.instance, args.zookeeper, args.user, new PasswordToken(args.password))
-    // val catalog = accumulo.catalog
-    val catalog: HadoopCatalog = HadoopCatalog(sparkContext, new Path("hdfs://localhost/catalog"))
-
-    val rdd = catalog.load[SpaceTimeKey](LayerId(args.inputLayer, 2))
+    val rdd = catalog.load[SpaceTimeKey](layer)
     
-    val ret = rdd
-      .mapKeys { key => key.updateTemporalComponent(key.temporalKey.time.withMonthOfYear(1).withDayOfMonth(1).withHourOfDay(0)) }
-      .averageByKey
-    catalog.save[SpaceTimeKey](LayerId(args.outputLayer,2), "results", ret, true)
+    val things = rdd.mapPartitionsWithIndex( (idx, iter) => {
+      var min: Long = Long.MaxValue
+      var max: Long = Long.MinValue
+      
+      iter.foreach{ case (key, tile) =>
+        val z = Z3(key.spatialKey.col, key.spatialKey.row, key.temporalKey.time.getYear).z
+        if (z > max) max = z
+        if (z < min) min = z
+      }
+      Iterator(idx -> (min, max))
+    }, true).collect
+
+    things.foreach{println}
+
   }
 }

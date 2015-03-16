@@ -90,7 +90,9 @@ object Benchmark extends ArgMain[BenchmarkArgs] with Logging {
   def getRdd(catalog: AccumuloCatalog, id: LayerId, polygon: Polygon, name: String): RasterRDD[SpaceTimeKey] = {
     val (lmd, params) = catalog.metaDataCatalog.load(id)
     val md = lmd.rasterMetaData  
+    println(s"getRDD MD: $md")
     val bounds = md.mapTransform(polygon.envelope)        
+    println(s"getRDD GridBounds: $bounds")
     val rdd = catalog.load[SpaceTimeKey](id, FilterSet(SpaceFilter[SpaceTimeKey](bounds)))
     rdd.setName(name)
     rdd

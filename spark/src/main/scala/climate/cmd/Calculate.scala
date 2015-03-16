@@ -30,7 +30,7 @@ object Calculate extends ArgMain[BenchmarkArgs] with Logging {
     val catalog = accumulo.catalog
     val layer = args.getLayers.head
     println(s"Working with: $layer")
-    val rdd = Benchmark.getRdd(catalog, layer, Extents.extents("USA"), "USA")
+    val rdd: RasterRDD[SpaceTimeKey] = Benchmark.getRdd(catalog, layer, Extents.extents("USA"), "USA")
     
     println(s"Record Count: ${rdd.count}")
     val things = rdd.mapPartitionsWithIndex( (idx, iter) => {

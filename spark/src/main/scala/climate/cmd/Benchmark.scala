@@ -85,7 +85,7 @@ object Extents extends GeoJsonSupport {
 object Benchmark extends ArgMain[BenchmarkArgs] with Logging {
   import Extents._
   
-  implicit val sparkContext = SparkUtils.createSparkContext("Benchmark")
+  
 
   def getRdd(catalog: AccumuloCatalog, id: LayerId, polygon: Polygon, name: String): RasterRDD[SpaceTimeKey] = {
     val (lmd, params) = catalog.metaDataCatalog.load(id)
@@ -140,6 +140,7 @@ object Benchmark extends ArgMain[BenchmarkArgs] with Logging {
 
 
   def main(args: BenchmarkArgs): Unit = {
+    implicit val sparkContext = SparkUtils.createSparkContext("Benchmark")
     val accumulo = AccumuloInstance(args.instance, args.zookeeper, args.user, new PasswordToken(args.password))
     val catalog = accumulo.catalog
     val layers = args.getLayers

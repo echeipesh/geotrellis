@@ -29,9 +29,10 @@ object Calculate extends ArgMain[BenchmarkArgs] with Logging {
     val accumulo = AccumuloInstance(args.instance, args.zookeeper, args.user, new PasswordToken(args.password))
     val catalog = accumulo.catalog
     val layer = args.getLayers.head
-
-    val rdd = catalog.load[SpaceTimeKey](layer)
+    println(s"Working with: $layer")
+    val rdd = catalog.load[SpaceTimeKey](layer).cache
     
+    println(s"Record Count: ${rdd.count}")
     val things = rdd.mapPartitionsWithIndex( (idx, iter) => {
       var min: Long = Long.MaxValue
       var max: Long = Long.MinValue
@@ -43,7 +44,7 @@ object Calculate extends ArgMain[BenchmarkArgs] with Logging {
       }
       Iterator(idx -> (min, max))
     }, true).collect
-
+    println("Partition min/max:")
     things.foreach{println}
 
   }

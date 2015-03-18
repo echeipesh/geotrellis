@@ -174,11 +174,15 @@ object Benchmark extends ArgMain[BenchmarkArgs] with Logging {
       //     rdds.head.combineTiles(rdds.tail)(local.Mean.apply)
       //     .foreachPartition(_ => {})
       // }
-
+      var diff:RasterRDD[SpaceTimeKey] = null
       Timer.timedTask(s"""Benchmark: {type: MultiModel-localSubtract-fresh, name: $name, layers: ${layers.toList}}""", s => logger.info(s)) {
-        val diff:RasterRDD[SpaceTimeKey] = rdds(1) localSubtract rdds(0)
+        diff = rdds(1) localSubtract rdds(0)
         diff.foreachPartition(_ => {})        
       }
+      Timer.timedTask(s"""Benchmark: {type: MultiModel-localSubtract-count, name: $name, layers: ${layers.toList}}""", s => logger.info(s)) {        
+        logger.info(s"RECORD COUNT: diff.count")
+      }
+
     }
   }
 }

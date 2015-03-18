@@ -144,38 +144,38 @@ object Benchmark extends ArgMain[BenchmarkArgs] with Logging {
     val accumulo = AccumuloInstance(args.instance, args.zookeeper, args.user, new PasswordToken(args.password))
     val catalog = accumulo.catalog
     val layers = args.getLayers
-    for { 
-      (name, polygon) <- extents
-      count <- 1 to 4
-    } {
-      val rdd = getRdd(catalog, layers.head, polygon, name)
-      Timer.timedTask(s"""Benchmark: {type: LoadTiles, name: $name}""", s => logger.info(s)){        
-        logger.info(s"Stats: $name = (${stats(rdd)})")        
-      }
+    // for { 
+    //   (name, polygon) <- extents
+    //   count <- 1 to 4
+    // } {
+    //   val rdd = getRdd(catalog, layers.head, polygon, name)
+    //   Timer.timedTask(s"""Benchmark: {type: LoadTiles, name: $name}""", s => logger.info(s)){        
+    //     logger.info(s"Stats: $name = (${stats(rdd)})")        
+    //   }
 
-      Timer.timedTask(s"""Benchmark: {type: AnnualZonalSummary, name: $name}""", s => logger.info(s)) {
-        zonalSummary(rdd, polygon)      
-      }
-    }
+    //   Timer.timedTask(s"""Benchmark: {type: AnnualZonalSummary, name: $name}""", s => logger.info(s)) {
+    //     zonalSummary(rdd, polygon)      
+    //   }
+    // }
 
     for { 
       (name, polygon) <- extents
     } {    
       val rdds = layers.map { layer => getRdd(catalog, layer, polygon, name)}
       
-      Timer.timedTask(s"""Benchmark: {type: MultiModel-averageByKey, name: $name, layers: ${layers.toList}}""", s => logger.info(s)) {
-        new RasterRDD[SpaceTimeKey](rdds.reduce(_ union _), rdds.head.metaData)
-          .averageByKey
-          .foreachPartition(_ => {})
-      }
+      // Timer.timedTask(s"""Benchmark: {type: MultiModel-averageByKey, name: $name, layers: ${layers.toList}}""", s => logger.info(s)) {
+      //   new RasterRDD[SpaceTimeKey](rdds.reduce(_ union _), rdds.head.metaData)
+      //     .averageByKey
+      //     .foreachPartition(_ => {})
+      // }
       
-      Timer.timedTask(s"""Benchmark: {type: MultiModel-combineTiles(local.Mean), name: $name, layers: ${layers.toList}}""", s => logger.info(s)) {
-        new RasterRDD[SpaceTimeKey](rdds.reduce(_ union _), rdds.head.metaData)
-          rdds.head.combineTiles(rdds.tail)(local.Mean.apply)
-          .foreachPartition(_ => {})
-      }
+      // Timer.timedTask(s"""Benchmark: {type: MultiModel-combineTiles(local.Mean), name: $name, layers: ${layers.toList}}""", s => logger.info(s)) {
+      //   new RasterRDD[SpaceTimeKey](rdds.reduce(_ union _), rdds.head.metaData)
+      //     rdds.head.combineTiles(rdds.tail)(local.Mean.apply)
+      //     .foreachPartition(_ => {})
+      // }
 
-      Timer.timedTask(s"""Benchmark: {type: MultiModel-localSubtract, name: $name, layers: ${layers.toList}}""", s => logger.info(s)) {
+      Timer.timedTask(s"""Benchmark: {type: MultiModel-localSubtract-fresh, name: $name, layers: ${layers.toList}}""", s => logger.info(s)) {
         val diff:RasterRDD[SpaceTimeKey] = rdds(1) localSubtract rdds(0)
         diff.foreachPartition(_ => {})        
       }

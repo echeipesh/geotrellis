@@ -180,7 +180,7 @@ object Benchmark extends ArgMain[BenchmarkArgs] with Logging {
         diff.foreachPartition(_ => {})        
       }
       Timer.timedTask(s"""Benchmark: {type: MultiModel-localSubtract-count, name: $name, layers: ${layers.toList}}""", s => logger.info(s)) {        
-        logger.info(s"RECORD COUNT: diff.count")
+        logger.info(s"RECORD COUNT: ${diff.count}")
       }
 
     }

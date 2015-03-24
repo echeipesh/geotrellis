@@ -24,26 +24,26 @@ import scala.collection.mutable
 object Majority extends Serializable {
   def apply(r: Tile*): Tile = apply(0, r)
 
-  def apply(rs: Seq[Tile])(implicit d: DI): Tile = apply(0, rs)
+  def apply(rs: Traversable[Tile])(implicit d: DI): Tile = apply(0, rs)
 
   def apply(level: Int, r: Tile*): Tile = apply(level, r)
 
-  def apply(level: Int, rs: Seq[Tile])(implicit d: DI): Tile = {
+  def apply(level: Int, rs: Traversable[Tile])(implicit d: DI): Tile = {
     rs.assertEqualDimensions
 
-    val layerCount = rs.length
+    val layerCount = rs.toSeq.length
     if(layerCount == 0) {
       sys.error("Can't compute majority of empty sequence")
     } else {
       val newCellType = rs.map(_.cellType).reduce(_.union(_))
-      val (cols, rows) = rs(0).dimensions
+      val (cols, rows) = rs.head.dimensions
       val tile = ArrayTile.alloc(newCellType, cols, rows)
 
       if(newCellType.isFloatingPoint) {
         val counts = mutable.Map[Double, Int]()
 
-        for(col <- 0 until cols) {
-          for(row <- 0 until rows) {
+        cfor(0)(_ < rows, _ + 1) { row =>
+          cfor(0)(_ < cols, _ + 1) { col =>
             counts.clear
             for(r <- rs) {
               val v = r.getDouble(col, row)
@@ -71,8 +71,8 @@ object Majority extends Serializable {
       } else {
         val counts = mutable.Map[Int, Int]()
 
-        for(col <- 0 until cols) {
-          for(row <- 0 until rows) {
+        cfor(0)(_ < rows, _ + 1) { row =>
+          cfor(0)(_ < cols, _ + 1) { col =>
             counts.clear
             for(r <- rs) {
               val v = r.get(col, row)
@@ -106,7 +106,7 @@ object Majority extends Serializable {
 trait MajorityMethods extends TileMethods {
   /** Assigns to each cell the value within the given rasters that is the most numerous. */
   def localMajority(rs: Traversable[Tile]): Tile =
-    Majority(Seq(tile) ++ rs)
+    Majority(Traversable(tile) ++ rs)
 
   /** Assigns to each cell the value within the given rasters that is the most numerous. */
   def localMajority(rs: Tile*)(implicit d: DI): Tile =
@@ -114,7 +114,7 @@ trait MajorityMethods extends TileMethods {
 
   /** Assigns to each cell the value within the given rasters that is the nth most numerous. */
   def localMajority(n: Int, rs: Traversable[Tile]): Tile =
-    Majority(n, Seq(tile) ++ rs)
+    Majority(n, Traversable(tile) ++ rs)
 
   /** Assigns to each cell the value within the given rasters that is the nth most numerous. */
   def localMajority(n: Int, rs: Tile*)(implicit d: DI): Tile =

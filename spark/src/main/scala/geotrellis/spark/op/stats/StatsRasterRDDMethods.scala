@@ -2,11 +2,10 @@ package geotrellis.spark.op.stats
 
 import geotrellis.raster._
 import geotrellis.raster.op.local._
-import geotrellis.raster.stats.FastMapHistogram
+import geotrellis.raster.histogram._
 import geotrellis.spark._
 import org.apache.spark.SparkContext._
-import geotrellis.raster.stats._
-
+import geotrellis.raster.op.stats._
 
 trait StatsRasterRDDMethods[K] extends RasterRDDMethods[K] {
 
@@ -33,5 +32,8 @@ trait StatsRasterRDDMethods[K] extends RasterRDDMethods[K] {
       .map{ case (key, tile) => tile.histogram }
       .reduce { (h1, h2) => FastMapHistogram.fromHistograms(Array(h1,h2)) }
   }
+
+  def classBreaks(numBreaks: Int): Array[Int] =
+    histogram.getQuantileBreaks(numBreaks)
 
 }

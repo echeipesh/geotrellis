@@ -41,6 +41,7 @@ object GeotrellisBuild extends Build {
     shellPrompt := { s => Project.extract(s).currentProject.id + " > " },
     version := Version.geotrellis,
     scalaVersion := Version.scala,
+    crossScalaVersions := Seq("2.11.5", "2.10.4"),
     organization := "com.azavea.geotrellis",
 
     // disable annoying warnings about 2.10.x
@@ -80,9 +81,9 @@ object GeotrellisBuild extends Build {
         </scm>
         <developers>
         <developer>
-        <id>joshmarcus</id>
-        <name>Josh Marcus</name>
-        <url>http://github.com/joshmarcus/</url>
+        <id>echeipesh</id>
+        <name>Eugene Cheipesh</name>
+        <url>http://github.com/echeipesh/</url>
           </developer>
         <developer>
         <id>lossyrob</id>
@@ -130,10 +131,13 @@ object GeotrellisBuild extends Build {
   lazy val macrosSettings = Seq(
     name := "geotrellis-macros",
     addCompilerPlugin("org.scalamacros" % "paradise" % "2.0.1" cross CrossVersion.full),
-    libraryDependencies ++= Seq(
-      scalaReflect,
-      "org.scalamacros" %% "quasiquotes" % "2.0.1"
-    ),
+    libraryDependencies <++= scalaVersion { 
+      case "2.10.4" => Seq(
+        "org.scala-lang" %  "scala-reflect" % "2.10.4",
+        "org.scalamacros" %% "quasiquotes" % "2.0.1")
+      case "2.11.5" => Seq(
+        "org.scala-lang" %  "scala-reflect" % "2.11.5")
+    },
     resolvers += Resolver.sonatypeRepo("snapshots")
   )
 
@@ -145,7 +149,7 @@ object GeotrellisBuild extends Build {
         Seq(
           jts,
           sprayJson,
-          sprayHttpx,
+//          sprayHttpx,
           apacheMath,
           spire
         )
@@ -197,15 +201,11 @@ object GeotrellisBuild extends Build {
       scalacOptions in compile ++= Seq("-optimize"),
       addCompilerPlugin("org.scalamacros" % "paradise" % "2.0.1" cross CrossVersion.full),
       libraryDependencies ++= Seq(
-        "com.typesafe" % "config" % "1.2.1",
-        scalaReflect,
+        typesafeConfig,
         jts,
-        jacksonCore,
-        jacksonMapper,
         spire,
-        monocleCore,
+        monocleCore, 
         monocleMacro,
-        sprayClient, // for reading args from URLs,
         openCSV
       )
     ) ++
@@ -248,17 +248,9 @@ object GeotrellisBuild extends Build {
       scalacOptions in compile ++=
         Seq("-optimize"),
       libraryDependencies ++= Seq(
-        scalatest % "test",
-        scalaReflect,
-        akkaKernel,
-        akkaRemote,
-        akkaActor,
-        akkaCluster,
-        jacksonCore,
-        jacksonMapper,
+        akkaKernel, akkaRemote, akkaActor, akkaCluster,
         spire,
-        monocleCore,
-        monocleMacro,
+        monocleCore, monocleMacro,
         sprayClient // for reading args from URLs,
       )
     ) ++
@@ -273,16 +265,15 @@ object GeotrellisBuild extends Build {
   lazy val engineTestSettings =
     Seq(
       name := "geotrellis-engine-test",
-      parallelExecution := false,
-      fork in test := false,
-      javaOptions in run += "-Xmx2G",
+      parallelExecution := true,
+      fork in test := true,
+      javaOptions in run += "-Xmx4G",
       scalacOptions in compile ++=
         Seq("-optimize"),
-      libraryDependencies ++= Seq(
-        scalatest % "test",
-        spire % "test",
+      libraryDependencies ++= Seq(        
         sprayClient % "test",
-        sprayRouting % "test"
+        sprayRouting % "test",
+        scalatest % "test"
       )
     ) ++
   defaultAssemblySettings
@@ -387,13 +378,13 @@ object GeotrellisBuild extends Build {
           "org.apache.spark" %% "spark-core" % Version.spark % "provided",
           "org.apache.hadoop" % "hadoop-client" % Version.hadoop % "provided",
           "org.apache.spark" %% "spark-graphx" % Version.spark % "provided",
-          "com.quantifind" %% "sumac" % "0.2.3",          
-          "de.javakaffee" % "kryo-serializers" % "0.27",          
-          logging,
-          spire, scalaz,
+          "com.quantifind" %% "sumac" % "0.3.0",
+          "org.apache.accumulo" % "accumulo-core" % "1.5.2",
+          "de.javakaffee" % "kryo-serializers" % "0.27",
+          logging, awsSdkS3,
+          spire,
           monocleCore, monocleMacro,
           nscalaTime,
-          sprayRouting, sprayCan,
           scalatest % "test"
         ),
       resolvers ++= Seq(
@@ -411,6 +402,34 @@ object GeotrellisBuild extends Build {
     ) ++
   defaultAssemblySettings ++
   net.virtualvoid.sbt.graph.Plugin.graphSettings
+
+  lazy val graph: Project =
+    Project("graph", file("graph"))
+      .settings(graphSettings: _*)
+      .dependsOn(spark % "test->test;compile->compile")
+
+  lazy val graphSettings =
+    Seq(
+      name := "geotrellis-graph",
+      fork := true,
+      parallelExecution in Test := false,
+      javaOptions ++= List(
+        "-Xmx8G",
+        "-Djava.library.path=/usr/local/lib",
+        "-Dsun.io.serialization.extendedDebugInfo=true"
+      ),
+      libraryDependencies ++=
+        Seq(
+          "org.apache.spark" %% "spark-graphx" % Version.spark % "provided",
+          scalatest % "test"
+        ),
+      resolvers ++= Seq(
+        "Cloudera Repo" at "https://repository.cloudera.com/artifactory/cloudera-repos"
+      )
+    ) ++
+  defaultAssemblySettings ++
+  net.virtualvoid.sbt.graph.Plugin.graphSettings
+
 
   // Project: index
   lazy val index: Project =
@@ -440,7 +459,7 @@ object GeotrellisBuild extends Build {
       javaOptions += "-Djava.library.path=/usr/local/lib",
       libraryDependencies ++=
         Seq(
-          "org.gdal" % "gdal" % "1.10.1",
+          "org.gdal"         % "gdal"       % "1.10.1",
           "com.github.scopt" % "scopt_2.10" % "3.2.0",
           scalatest % "test"
         ),
@@ -490,11 +509,7 @@ object GeotrellisBuild extends Build {
 
   lazy val devSettings =
     Seq(
-      libraryDependencies ++=
-        Seq(
-          scalaReflect,
-          sigar
-        ),
+      libraryDependencies += sigar,
       Keys.fork in run := true,
       fork := true,
       javaOptions in run ++=

@@ -15,6 +15,7 @@ import org.apache.hadoop.fs.Path
 
 class HadoopCatalogSpec extends FunSpec
 with Matchers
+with RasterRDDMatchers
 with TestEnvironment
 with OnlyIfCanRunSpark
 {
@@ -82,6 +83,24 @@ with OnlyIfCanRunSpark
         tile.get(497,511) should be (2)
       }
 
+      it("should be able to combine pairs via Traversable"){
+        val tileBounds = GridBounds(915,611,917,616)
+        val filters = new FilterSet[SpatialKey] withFilter SpaceFilter(tileBounds)
+        val rdd1 = catalog.load[SpatialKey](LayerId("ones", 10), filters)
+        val rdd2 = catalog.load[SpatialKey](LayerId("ones", 10), filters)
+        val rdd3 = catalog.load[SpatialKey](LayerId("ones", 10), filters)
+
+        val expected = rdd1.combinePairs(Seq(rdd2, rdd3)){ pairs: Traversable[(SpatialKey, Tile)] =>
+          pairs.toSeq.reverse.head
+        }
+
+        val actual = Seq(rdd1, rdd2, rdd3).combinePairs { pairs: Traversable[(SpatialKey, Tile)] =>
+          pairs.toSeq.reverse.head
+        }
+
+        rastersEqual(expected, actual)
+      }
+
       it("should find default params based on key") {
         val defaultParams = HadoopCatalog.BaseParams.withKeyParams[SpatialKey]("spatial-layers")
         val cat: HadoopCatalog = HadoopCatalog(sc, catalogPath, defaultParams)
@@ -98,6 +117,22 @@ with OnlyIfCanRunSpark
         val cat: HadoopCatalog = HadoopCatalog(sc, catalogPath, defaultParams)
         cat.save(LayerId("onesSpecial", level.zoom), onesRdd)
         assert(fs.exists(new Path(catalogPath, "special/onesSpecial")))
+      }
+
+      it("should allow filtering files in hadoopGeoTiffRDD") {
+        val tilesDir = new Path(localFS.getWorkingDirectory, "../raster-test/data/one-month-tiles/")
+        val source = sc.hadoopGeoTiffRDD(tilesDir)
+
+        // Raises exception if the bogus file isn't properly filtered out
+        Ingest(source, LatLng, layoutScheme)
+      }
+
+      it("should allow overriding tiff file extensions in hadoopGeoTiffRDD") {
+        val tilesDir = new Path(localFS.getWorkingDirectory, "../raster-test/data/one-month-tiles-tiff/")
+        val source = sc.hadoopGeoTiffRDD(tilesDir, ".tiff")
+
+        // Raises exception if the ".tiff" extension override isn't provided
+        Ingest(source, LatLng, layoutScheme)
       }
     }
   }

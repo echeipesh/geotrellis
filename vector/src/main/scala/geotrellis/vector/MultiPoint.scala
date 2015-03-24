@@ -42,7 +42,11 @@ case class MultiPoint(jtsGeom: jts.MultiPoint) extends MultiGeometry
                                                   with ZeroDimensions {
 
   /** Returns a unique representation of the geometry based on standard coordinate ordering. */
-  def normalized(): MultiPoint = { jtsGeom.normalize ; MultiPoint(jtsGeom) }
+  def normalized(): MultiPoint = { 
+    val geom = jtsGeom.clone.asInstanceOf[jts.MultiPoint]
+    geom.normalize
+    MultiPoint(geom)
+  }
 
   /** Returns the Points contained in MultiPoint. */
   lazy val points: Array[Point] = vertices
@@ -61,6 +65,18 @@ case class MultiPoint(jtsGeom: jts.MultiPoint) extends MultiGeometry
   lazy val vertexCount: Int = jtsGeom.getNumPoints
 
   // -- Intersection
+
+  /**
+   * Computes a Result that represents a Geometry made up of the points shared
+   * by the contained lines.
+   */
+  def &(): MultiPointMultiPointIntersectionResult =
+    intersection()
+
+  def intersection(): MultiPointMultiPointIntersectionResult =
+    points.map(_.jtsGeom).reduce[jts.Geometry] {
+      _.intersection(_)
+    }
 
   /**
    * Computes a Result that represents a Geometry made up of the points shared
@@ -201,6 +217,14 @@ case class MultiPoint(jtsGeom: jts.MultiPoint) extends MultiGeometry
 
   // -- Difference
 
+  /**
+   * Computes a Result that represents a Geometry made up of all the points in
+   * the first line not in the other contained lines.
+   */
+  def difference(): MultiPointMultiPointDifferenceResult =
+    points.map(_.jtsGeom).reduce[jts.Geometry] {
+      _.difference(_)
+    }
 
   /**
    * Computes a Result that represents a Geometry made up of all the points in
@@ -218,6 +242,15 @@ case class MultiPoint(jtsGeom: jts.MultiPoint) extends MultiGeometry
 
 
   // -- SymDifference
+
+  /**
+   * Computes a Result that represents a Geometry made up of all the unique
+   * points in this MultiPoint.
+   */
+  def symDifference(): MultiPointMultiPointSymDifferenceResult =
+    points.map(_.jtsGeom).reduce[jts.Geometry] {
+      _.symDifference(_)
+    }
 
   /**
    * Computes a Result that represents a Geometry made up of all the points in

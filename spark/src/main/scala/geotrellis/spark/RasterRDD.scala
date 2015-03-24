@@ -17,8 +17,6 @@
 package geotrellis.spark
 
 import geotrellis.raster._
-import geotrellis.spark.ingest._
-import geotrellis.vector.Extent
 import org.apache.spark.SparkContext._
 import org.apache.spark._
 import org.apache.spark.rdd._
@@ -50,10 +48,13 @@ class RasterRDD[K: ClassTag](val tileRdd: RDD[(K, Tile)], val metaData: RasterMe
       tileRdd map { case (key, tile) => key -> f(tile) }
     }
 
-  def mapPairs(f: ((K, Tile)) => (K, Tile)): RasterRDD[K] =
+  def mapPairs[R: ClassTag](f: ((K, Tile)) => (R, Tile)): RasterRDD[R] =
     asRasterRDD(metaData) {
       tileRdd map { row => f(row) }
     }
+
+  def combineTiles(other: RasterRDD[K])(f: (Tile, Tile) => Tile): RasterRDD[K] =
+    combinePairs(other) { case ((k1, t1), (k2, t2)) => (k1, f(t1, t2)) }
 
   def combinePairs[R: ClassTag](other: RasterRDD[K])(f: ((K, Tile), (K, Tile)) => (R, Tile)): RasterRDD[R] =
     asRasterRDD(metaData) {
@@ -62,16 +63,10 @@ class RasterRDD[K: ClassTag](val tileRdd: RDD[(K, Tile)], val metaData: RasterMe
       }
     }
 
-  def combineTiles(other: RasterRDD[K])(f: (Tile, Tile) => Tile): RasterRDD[K] =
-    combinePairs(other) { case ((k1, t1), (k2, t2)) => (k1, f(t1, t2)) }
-
-  def combineTiles(others: Traversable[RasterRDD[K]])(f: Seq[Tile] => Tile): RasterRDD[K] =
-    combinePairs(others) { pairs => pairs.head._1 -> f(pairs.map(_._2)) }
-
-  def combinePairs(others: Traversable[RasterRDD[K]])(f: (Seq[(K, Tile)] => (K, Tile))): RasterRDD[K] = {
-    def create(t: (K, Tile)) = Seq(t)
-    def mergeValue(ts: Seq[(K, Tile)], t: (K, Tile)) = ts :+ t
-    def mergeContainers(ts1: Seq[(K, Tile)], ts2: Seq[(K, Tile)]) = ts1 ++ ts2
+  def combinePairs(others: Traversable[RasterRDD[K]])(f: (Traversable[(K, Tile)] => (K, Tile))): RasterRDD[K] = {
+    def create(t: (K, Tile)) = List(t)
+    def mergeValue(ts: List[(K, Tile)], t: (K, Tile)) = ts :+ t
+    def mergeContainers(ts1: List[(K, Tile)], ts2: Traversable[(K, Tile)]) = ts1 ++ ts2
 
     asRasterRDD(metaData) {
       (this :: others.toList)
@@ -114,6 +109,27 @@ class RasterRDD[K: ClassTag](val tileRdd: RDD[(K, Tile)], val metaData: RasterMe
           }
         (min, max)
       }
+
+  def minMaxDouble: (Double, Double) =
+    map(_.tile.findMinMaxDouble)
+      .reduce { (t1, t2) =>
+        val (min1, max1) = t1
+        val (min2, max2) = t2
+        val min =
+          if(isNoData(min1)) min2
+          else {
+            if(isNoData(min2)) min1
+            else math.min(min1, min2)
+          }
+        val max =
+          if(isNoData(max1)) max2
+          else {
+            if(isNoData(max2)) max1
+            else math.max(max1, max2)
+          }
+        (min, max)
+      }
+
 }
 
 object RasterRDD {

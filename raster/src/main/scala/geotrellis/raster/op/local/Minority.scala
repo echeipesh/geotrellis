@@ -1,12 +1,12 @@
 /*
  * Copyright (c) 2014 Azavea.
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -25,13 +25,13 @@ object Minority extends Serializable {
   def apply(r: Tile*): Tile =
     apply(0, r)
 
-  def apply(rs: Seq[Tile])(implicit d: DI): Tile =
+  def apply(rs: Traversable[Tile])(implicit d: DI): Tile =
     apply(0, rs)
 
   def apply(level: Int, rs: Tile*): Tile =
     apply(level, rs)
 
-  def apply(level: Int, rs: Seq[Tile])(implicit d: DI): Tile = {
+  def apply(level: Int, rs: Traversable[Tile])(implicit d: DI): Tile = {
     // TODO: Replace all of these with rs.assertEqualDimensions
     if(Set(rs.map(_.dimensions)).size != 1) {
       val dimensions = rs.map(_.dimensions).toSeq
@@ -39,19 +39,19 @@ object Minority extends Serializable {
         s"$dimensions are not all equal")
     }
 
-    val layerCount = rs.length
+    val layerCount = rs.toSeq.length
     if(layerCount == 0) {
       sys.error(s"Can't compute minority of empty sequence")
     } else {
       val newCellType = rs.map(_.cellType).reduce(_.union(_))
-      val (cols, rows) = rs(0).dimensions
+      val (cols, rows) = rs.head.dimensions
       val tile = ArrayTile.alloc(newCellType, cols, rows)
 
       if(newCellType.isFloatingPoint) {
         val counts = mutable.Map[Double, Int]()
 
-        for(col <- 0 until cols) {
-          for(row <- 0 until rows) {
+        cfor(0)(_ < rows, _ + 1) { row =>
+          cfor(0)(_ < cols, _ + 1) { col =>
             counts.clear
             for(r <- rs) {
               val v = r.getDouble(col, row)
@@ -113,16 +113,16 @@ object Minority extends Serializable {
 
 trait MinorityMethods extends TileMethods {
   /** Assigns to each cell the value within the given rasters that is the least numerous. */
-  def localMinority(rs: Seq[Tile]): Tile =
-    Minority(tile +: rs)
+  def localMinority(rs: Traversable[Tile]): Tile =
+    Minority(tile +: rs.toSeq)
 
   /** Assigns to each cell the value within the given rasters that is the least numerous. */
   def localMinority(rs: Tile*)(implicit d: DI): Tile =
     localMinority(rs)
 
   /** Assigns to each cell the value within the given rasters that is the nth least numerous. */
-  def localMinority(n: Int, rs: Seq[Tile]): Tile =
-    Minority(n, tile +: rs)
+  def localMinority(n: Int, rs: Traversable[Tile]): Tile =
+    Minority(n, tile +: rs.toSeq)
 
   /** Assigns to each cell the value within the given rasters that is the nth least numerous. */
   def localMinority(n: Int, rs: Tile*)(implicit d: DI): Tile =

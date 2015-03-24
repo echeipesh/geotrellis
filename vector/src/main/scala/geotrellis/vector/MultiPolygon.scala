@@ -40,12 +40,16 @@ case class MultiPolygon(jtsGeom: jts.MultiPolygon) extends MultiGeometry
                                                    with TwoDimensions {
 
   /** Returns a unique representation of the geometry based on standard coordinate ordering. */
-  def normalized(): MultiPolygon = { jtsGeom.normalize ; MultiPolygon(jtsGeom) }
+  def normalized(): MultiPolygon = { 
+    val geom = jtsGeom.clone.asInstanceOf[jts.MultiPolygon]
+    geom.normalize
+    MultiPolygon(geom)
+  }
 
   /** Returns the Polygons contained in MultiPolygon. */
   lazy val polygons: Array[Polygon] = {
     for (i <- 0 until jtsGeom.getNumGeometries) yield {
-      Polygon(jtsGeom.getGeometryN(i).asInstanceOf[jts.Polygon])
+      Polygon(jtsGeom.getGeometryN(i).clone.asInstanceOf[jts.Polygon])
     }
   }.toArray
 
@@ -70,6 +74,11 @@ case class MultiPolygon(jtsGeom: jts.MultiPolygon) extends MultiGeometry
   lazy val vertexCount: Int = jtsGeom.getNumPoints
 
   // -- Intersection
+
+  def intersection(): MultiPolygonMultiPolygonIntersectionResult =
+    polygons.map(_.jtsGeom).reduce[jts.Geometry] {
+      _.intersection(_)
+    }
 
   def &(p: Point): PointGeometryIntersectionResult =
     intersection(p)
@@ -107,8 +116,9 @@ case class MultiPolygon(jtsGeom: jts.MultiPolygon) extends MultiGeometry
   def |(p: Polygon): TwoDimensionsTwoDimensionsUnionResult =
     union(p)
 
-  def union(p: Polygon): TwoDimensionsTwoDimensionsUnionResult =
-    Seq(this, MultiPolygon(p)).unioned
+  def union(p: Polygon): TwoDimensionsTwoDimensionsUnionResult = {
+    (this.polygons :+ p).toSeq.unionGeometries
+  }
 
   def |(ps: MultiPoint): LineMultiPolygonUnionResult =
     union(ps)
@@ -122,12 +132,17 @@ case class MultiPolygon(jtsGeom: jts.MultiPolygon) extends MultiGeometry
   def |(ps: MultiPolygon): TwoDimensionsTwoDimensionsUnionResult =
     union(ps)
   def union(ps: MultiPolygon): TwoDimensionsTwoDimensionsUnionResult =
-    Seq(this, ps).unioned
+    (this.polygons ++ ps.polygons).toSeq.unionGeometries
 
   def union: TwoDimensionsTwoDimensionsUnionResult =
-    polygons.toSeq.unioned
+    polygons.toSeq.unionGeometries
 
   // -- Difference
+
+  def difference(): MultiPolygonMultiPolygonDifferenceResult =
+    polygons.map(_.jtsGeom).reduce[jts.Geometry] {
+      _.difference(_)
+    }
 
   def -(p: Point): MultiPolygonXDifferenceResult =
     difference(p)
@@ -160,6 +175,11 @@ case class MultiPolygon(jtsGeom: jts.MultiPolygon) extends MultiGeometry
     jtsGeom.difference(ps.jtsGeom)
 
   // -- SymDifference
+
+  def symDifference(): MultiPolygonMultiPolygonSymDifferenceResult =
+    polygons.map(_.jtsGeom).reduce[jts.Geometry] {
+      _.symDifference(_)
+    }
 
   def symDifference(g: ZeroDimensions): PointMultiPolygonSymDifferenceResult =
     jtsGeom.symDifference(g.jtsGeom)

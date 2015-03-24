@@ -23,7 +23,10 @@ trait Geometry {
 
   val jtsGeom: jts.Geometry
 
-//  assert(jtsGeom.isValid, s"Geometry is invalid: $this")
+// This assertion is commented out because it too easily throws exceptions
+// assert(jtsGeom.isValid, s"Geometry is invalid: $this")
+  def isValid: Boolean =
+    jtsGeom.isValid
 
   def distance(other: Geometry): Double =
     jtsGeom.distance(other.jtsGeom)
@@ -55,7 +58,7 @@ object Geometry {
    * Wraps JTS Geometry in correct container and attempts to cast.
    * Useful when sourcing objects from JTS interface.
    */
-  def fromJts[G <: Geometry](obj: jts.Geometry): G = {
+  def apply[G <: Geometry](obj: jts.Geometry): G = {
     obj match {
       case obj: jts.Point => Point(obj)
       case obj: jts.LineString => Line(obj)

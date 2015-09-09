@@ -39,8 +39,14 @@ object Reproject {
         ((key, newExtent), newTile)
       }
 
-    val metadata =
+    val reprojectedMetaData =
       RasterMetaData.fromRdd(reprojectedTiles, destCRS, rdd.metaData.layout) { key => key._2 }
+
+    val reprojectedBounds = rdd.bounds.map { key =>
+      val extent = rdd.metaData.mapTransform(key)
+      val newSpatialKey = reprojectedMetaData.mapTransform(extent.center)
+      key.updateSpatialComponent(newSpatialKey)
+    }
 
     val tiler: Tiler[(K, Extent), K, Tile] = {
       val getExtent = (inKey: (K, Extent)) => inKey._2
@@ -48,7 +54,7 @@ object Reproject {
       Tiler(getExtent, createKey)
     }
 
-    new RasterRDD(tiler(reprojectedTiles, metadata, options.method), metadata)
+     RasterRDD(tiler(reprojectedTiles, reprojectedMetaData, options.method), reprojectedBounds, reprojectedMetaData)
   }
 
   def apply[K: SpatialComponent: ClassTag](
@@ -66,8 +72,14 @@ object Reproject {
         ((key, newExtent), newTile)
       }
 
-    val metadata =
+    val reprojectedMetaData =
       RasterMetaData.fromRdd(reprojectedTiles, destCRS, rdd.metaData.layout) { key => key._2 }
+
+    val reprojectedBounds = rdd.bounds.map { key =>
+      val extent = rdd.metaData.mapTransform(key)
+      val newSpatialKey = reprojectedMetaData.mapTransform(extent.center)
+      key.updateSpatialComponent(newSpatialKey)
+    }
 
     val tiler: Tiler[(K, Extent), K, MultiBandTile] = {
       val getExtent = (inKey: (K, Extent)) => inKey._2
@@ -75,7 +87,7 @@ object Reproject {
       Tiler(getExtent, createKey) _
     }
 
-    new MultiBandRasterRDD(tiler(reprojectedTiles, metadata, options.method), metadata)
+    new MultiBandRasterRDD(tiler(reprojectedTiles, reprojectedMetaData, options.method), reprojectedBounds, reprojectedMetaData)
   }
 
   def apply[K: SpatialComponent: ClassTag](rdd: RasterRDD[K], destCRS: CRS): RasterRDD[K] =

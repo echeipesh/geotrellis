@@ -137,7 +137,7 @@ trait FocalOperation[K] extends RasterRDDMethods[K] {
           (key, calc(neighborhoodTile, neighborhood, Some(analysisArea)))
         }
 
-    new RasterRDD(rdd, rasterRDD.metaData)
+    new RasterRDD(rdd, rasterRDD.bounds, rasterRDD.metaData)
   }
 
   def focalWithExtent(n: Neighborhood)
@@ -164,6 +164,6 @@ trait FocalOperation[K] extends RasterRDDMethods[K] {
       (key, res)
     }
 
-    new RasterRDD(rdd, rasterRDD.metaData)
+    new RasterRDD(rdd, rasterRDD.bounds, rasterRDD.metaData)
   }
 }

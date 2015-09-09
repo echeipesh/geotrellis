@@ -26,7 +26,8 @@ object MultiBandIngest{
     val (zoom, rasterMetaData) =
       RasterMetaData.fromRdd(reprojectedTiles, destCRS, layoutScheme)(_.projectedExtent.extent)
     val tiledRdd = tiler(sourceTiles, rasterMetaData, resampleMethod).cache()
-    val rasterRdd = new MultiBandRasterRDD(tiledRdd, rasterMetaData)
+    val bounds = implicitly[Boundable[K]].getKeyBounds(tiledRdd)
+    val rasterRdd = new MultiBandRasterRDD(tiledRdd, bounds, rasterMetaData)
 
     def buildPyramid(zoom: Int, rdd: MultiBandRasterRDD[K]): List[(Int, MultiBandRasterRDD[K])] = {
       if (zoom > 1) {

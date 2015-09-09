@@ -29,7 +29,7 @@ import scala.reflect.ClassTag
  * @param rdd       RDD of keys and values in n-dimensional space
  * @param bounds    TODO: n-dimensional bounding box containing all the points in this RDD
  */
-class BoundRDD[K: ClassTag, V: ClassTag](rdd: RDD[(K, V)]) extends RDD[(K, V)](rdd) {
+class BoundRDD[K: ClassTag, V: ClassTag](rdd: RDD[(K, V)], val bounds: KeyBounds[K]) extends RDD[(K, V)](rdd) {
   val defaultPartitionSize: Int =  16384
 
   override def compute(split: Partition, context: TaskContext) =

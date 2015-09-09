@@ -12,7 +12,7 @@ import scala.reflect.ClassTag
 object Pyramid extends Logging {
 
   def up[K: SpatialComponent: ClassTag, TileType : MergeView: CellGridPrototypeView](
-    rdd: RDD[(K, TileType)], 
+    rdd: RDD[(K, TileType)],
     sourceLayout: LayoutDefinition, 
     targetLayout: LayoutDefinition
   ): RDD[(K, TileType)] = {
@@ -44,6 +44,22 @@ object Pyramid extends Logging {
     nextRdd
   }
 
+  def up[K: SpatialComponent: ClassTag, TileType : MergeView: CellGridPrototypeView: ClassTag](
+    rdd: BoundRDD[K, TileType],
+    sourceLayout: LayoutDefinition,
+    targetLayout: LayoutDefinition
+  ): BoundRDD[K, TileType] = {
+    val nextBounds = rdd.bounds.map { key =>
+      val extent = sourceLayout.mapTransform(key)
+      val newSpatialKey = targetLayout.mapTransform(extent.center)
+      key.updateSpatialComponent(newSpatialKey)
+    }
+
+    val nextRdd = up(rdd: RDD[(K, TileType)], sourceLayout, targetLayout)
+
+    new BoundRDD(nextRdd, nextBounds)
+  }
+
   def up[K: SpatialComponent: ClassTag](rdd: RasterRDD[K], layoutScheme: LayoutScheme, zoom: Int): (Int, RasterRDD[K]) = {
     val LayoutLevel(nextZoom, nextLayout) = layoutScheme.zoomOut(LayoutLevel(zoom, rdd.metaData.layout))
     val nextMetaData = RasterMetaData(
@@ -53,7 +69,8 @@ object Pyramid extends Logging {
       rdd.metaData.crs
     )
     val nextRdd = up(rdd, rdd.metaData.layout, nextLayout)
-    nextZoom -> new RasterRDD(nextRdd, nextMetaData)
+
+    nextZoom -> RasterRDD(nextRdd, nextMetaData)
   }
 
   def up[K: SpatialComponent: ClassTag](rdd: MultiBandRasterRDD[K], layoutScheme: LayoutScheme, zoom: Int): (Int, MultiBandRasterRDD[K]) = {
@@ -65,6 +82,6 @@ object Pyramid extends Logging {
       rdd.metaData.crs
     )
     val nextRdd = up(rdd, rdd.metaData.layout, nextLayout)
-    nextZoom -> new MultiBandRasterRDD(nextRdd, nextMetaData)
+    nextZoom -> MultiBandRasterRDD(nextRdd, nextMetaData)
   }
 }

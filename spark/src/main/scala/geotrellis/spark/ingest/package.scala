@@ -36,6 +36,11 @@ package object ingest {
     Tiler(getExtent, createKey)
   }
 
+  implicit def spaceTimeInputKeyMultibandTiler: Tiler[SpaceTimeInputKey, SpaceTimeKey, MultiBandTile] = {
+    val getExtent = (inKey: SpaceTimeInputKey) => inKey.extent
+    val createKey = (inKey: SpaceTimeInputKey, s: SpatialKey) => SpaceTimeKey(s.col, s.row, inKey.time)
+    Tiler(getExtent, createKey)
+  }
 
   type CellGridPrototypeView[TileType] = TileType => CellGridPrototype[TileType]
 

@@ -5,6 +5,7 @@ import geotrellis.spark.tiling._
 import geotrellis.vector.{ProjectedExtent, Extent}
 
 import geotrellis.proj4.CRS
+import monocle.Lens
 
 import org.apache.spark.rdd._
 
@@ -87,4 +88,6 @@ object RasterMetaData {
     val LayoutLevel(zoom, layout) = scheme.levelFor(uncappedExtent, cellSize)
     (zoom, RasterMetaData(cellType, layout, uncappedExtent, crs))
   }
+
+  implicit def _layout = Lens[RasterMetaData, LayoutDefinition](_.layout)(l => md => md.copy(layout = l))
 }

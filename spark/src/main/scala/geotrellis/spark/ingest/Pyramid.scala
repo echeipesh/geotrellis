@@ -4,6 +4,8 @@ import geotrellis.spark._
 import geotrellis.spark.tiling._
 import geotrellis.raster._
 import geotrellis.raster.mosaic._
+import monocle._
+import monocle.syntax._
 import org.apache.spark.Logging
 import org.apache.spark.rdd._
 
@@ -44,27 +46,15 @@ object Pyramid extends Logging {
     nextRdd
   }
 
-  def up[K: SpatialComponent: ClassTag](rdd: RasterRDD[K], layoutScheme: LayoutScheme, zoom: Int): (Int, RasterRDD[K]) = {
-    val LayoutLevel(nextZoom, nextLayout) = layoutScheme.zoomOut(LayoutLevel(zoom, rdd.metaData.layout))
-    val nextMetaData = RasterMetaData(
-      rdd.metaData.cellType,
-      nextLayout,
-      rdd.metaData.extent,
-      rdd.metaData.crs
-    )
-    val nextRdd = up(rdd, rdd.metaData.layout, nextLayout)
-    nextZoom -> new ContextRDD(nextRdd, nextMetaData)
-  }
-
-  def up[K: SpatialComponent: ClassTag](rdd: MultiBandRasterRDD[K], layoutScheme: LayoutScheme, zoom: Int)(implicit d: DummyImplicit): (Int, MultiBandRasterRDD[K]) = {
-    val LayoutLevel(nextZoom, nextLayout) = layoutScheme.zoomOut(LayoutLevel(zoom, rdd.metadata.layout))
-    val nextMetaData = RasterMetaData(
-      rdd.metadata.cellType,
-      nextLayout,
-      rdd.metadata.extent,
-      rdd.metadata.crs
-    )
-    val nextRdd = up(rdd, rdd.metadata.layout, nextLayout)
+  def up[K: SpatialComponent: ClassTag, V: MergeView: CellGridPrototypeView, M](
+    rdd: RDD[(K, V)] with Metadata[M],
+    layoutScheme: LayoutScheme,
+    zoom: Int
+  )(implicit _layout: Lens[M, LayoutDefinition]): (Int, RDD[(K, V)] with Metadata[M]) = {
+    val layout: LayoutDefinition = rdd.metadata &|-> _layout get
+    val LayoutLevel(nextZoom, nextLayout) = layoutScheme.zoomOut(LayoutLevel(zoom, layout))
+    val nextRdd = up(rdd, layout, nextLayout)
+    val nextMetaData = rdd.metadata &|-> _layout set nextLayout
     nextZoom -> new ContextRDD(nextRdd, nextMetaData)
   }
 

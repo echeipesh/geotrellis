@@ -1,9 +1,10 @@
 package geotrellis.spark.op
 
-import geotrellis.spark.RasterRDD
+import geotrellis.raster.Tile
+import org.apache.spark.rdd.RDD
 import scala.reflect.ClassTag
 
 package object stats {
-  implicit class StatsRasterRDDSourceExtensions[K](val rasterRDD: RasterRDD[K])(implicit val keyClassTag: ClassTag[K])
-    extends StatsRasterRDDMethods[K] { }
+  implicit class withStatsTileRDDMethods[K: ClassTag](val self: RDD[(K, Tile)])
+    extends StatsTileRDDMethods[K] { }
 }

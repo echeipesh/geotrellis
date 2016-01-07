@@ -2,14 +2,17 @@ package geotrellis.spark.op.stats
 
 import geotrellis.raster._
 import geotrellis.raster.op.local._
+import geotrellis.raster.op.stats._
 import geotrellis.raster.histogram._
 import geotrellis.spark._
-import org.apache.spark.SparkContext._
-import geotrellis.raster.op.stats._
+import org.apache.spark.rdd.RDD
 
-trait StatsRasterRDDMethods[K] extends RasterRDDMethods[K] {
+import scala.reflect.ClassTag
 
-  def averageByKey: RasterRDD[K] = {
+abstract class StatsTileRDDMethods[K: ClassTag] {
+  val self: RDD[(K, Tile)]
+
+  def averageByKey: RDD[(K, Tile)] = {
     val createCombiner = (tile: Tile) => tile -> 1
     val mergeValue = (tup: (Tile, Int), tile2: Tile) => {
       val (tile1, count) = tup
@@ -20,15 +23,13 @@ trait StatsRasterRDDMethods[K] extends RasterRDDMethods[K] {
       val (tile2, count2) = tup2
       tile1 + tile2 -> (count1 + count2)
     }
-    rasterRDD.withContext { rdd =>
-      rdd
-        .combineByKey(createCombiner, mergeValue, mergeCombiners)
-        .mapValues { case (tile, count) => tile / count}
-    }
+    self
+      .combineByKey(createCombiner, mergeValue, mergeCombiners)
+      .mapValues { case (tile, count) => tile / count}
   }
 
   def histogram: Histogram = {
-    rasterRDD
+    self
       .map{ case (key, tile) => tile.histogram }
       .reduce { (h1, h2) => FastMapHistogram.fromHistograms(Array(h1,h2)) }
   }
@@ -37,7 +38,7 @@ trait StatsRasterRDDMethods[K] extends RasterRDDMethods[K] {
     histogram.getQuantileBreaks(numBreaks)
 
   def minMax: (Int, Int) =
-    rasterRDD.map(_.tile.findMinMax)
+    self.map(_.tile.findMinMax)
       .reduce { (t1, t2) =>
         val (min1, max1) = t1
         val (min2, max2) = t2
@@ -57,7 +58,7 @@ trait StatsRasterRDDMethods[K] extends RasterRDDMethods[K] {
       }
 
   def minMaxDouble: (Double, Double) =
-    rasterRDD.map(_.tile.findMinMaxDouble)
+    self.map(_.tile.findMinMaxDouble)
       .reduce { (t1, t2) =>
         val (min1, max1) = t1
         val (min2, max2) = t2

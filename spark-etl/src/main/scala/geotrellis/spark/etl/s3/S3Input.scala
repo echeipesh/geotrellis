@@ -10,7 +10,7 @@ import org.apache.spark.SparkContext
 
 import scala.reflect.ClassTag
 
-abstract class S3Input[I: IngestKey, K: ClassTag](implicit tiler: Tiler[I, K, Tile]) extends IngestInputPlugin[I, K] {
+abstract class S3Input[I: IngestKey, V: ClassTag] extends InputPlugin[I, V] {
   val name = "s3"
   val requiredKeys = Array("bucket", "key")
 

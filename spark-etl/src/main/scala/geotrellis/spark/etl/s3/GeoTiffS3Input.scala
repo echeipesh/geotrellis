@@ -8,9 +8,8 @@ import geotrellis.vector.ProjectedExtent
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 
-class GeoTiffS3Input extends S3Input[ProjectedExtent, SpatialKey] {
+class GeoTiffS3Input extends S3Input[ProjectedExtent, Tile] {
   val format = "geotiff"
-  def source(props: Parameters)(implicit sc: SparkContext): RDD[(ProjectedExtent, V)] =
+  def apply(props: Parameters)(implicit sc: SparkContext): RDD[(ProjectedExtent, Tile)] =
     sc.newAPIHadoopRDD(configuration(props), classOf[GeoTiffS3InputFormat], classOf[ProjectedExtent], classOf[Tile])
 }
-

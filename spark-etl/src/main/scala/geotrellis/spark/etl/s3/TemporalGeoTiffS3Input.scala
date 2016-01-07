@@ -7,9 +7,9 @@ import geotrellis.spark._
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 
-class TemporalGeoTiffS3Input extends S3Input[SpaceTimeInputKey, SpaceTimeKey] {
+class TemporalGeoTiffS3Input extends S3Input[SpaceTimeInputKey, Tile] {
   val format = "temporal-geotiff"
 
-  def source(props: Parameters)(implicit sc: SparkContext): RDD[(SpaceTimeInputKey, V)] =
+  def apply(props: Parameters)(implicit sc: SparkContext): RDD[(SpaceTimeInputKey, Tile)] =
     sc.newAPIHadoopRDD(configuration(props), classOf[TemporalGeoTiffS3InputFormat], classOf[SpaceTimeInputKey], classOf[Tile])
 }

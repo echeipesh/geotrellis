@@ -2,30 +2,44 @@ package geotrellis.spark.etl
 
 import com.typesafe.scalalogging.slf4j.LazyLogging
 import geotrellis.raster.RasterExtent
+import geotrellis.raster.mosaic._
+import geotrellis.raster.reproject._
 import geotrellis.spark.ingest._
+import geotrellis.spark.io.AttributeStore
 import geotrellis.spark.io.index.KeyIndexMethod
 import geotrellis.spark._
 import geotrellis.spark.tiling.{LayoutDefinition, LayoutScheme}
 import geotrellis.spark.op.stats._
 import geotrellis.raster.io.json._
 import org.apache.spark.SparkContext
+import org.apache.spark.rdd.RDD
 import scala.reflect._
 import spray.json._
+import geotrellis.proj4.CRS
+import geotrellis.raster.resample.NearestNeighbor
+import geotrellis.raster.{CellType, Tile, CellGrid}
+import geotrellis.spark.reproject._
+import geotrellis.spark._
+import geotrellis.spark.ingest._
+import geotrellis.spark.tiling.{LayoutDefinition, LayoutScheme}
+import org.apache.spark.SparkContext
+import org.apache.spark.rdd.RDD
+import org.apache.spark.storage.StorageLevel
+
 
 import scala.reflect.runtime.universe._
 
 object Etl {
   val defaultModules = Array(s3.S3Module, hadoop.HadoopModule, accumulo.AccumuloModule)
-
-  def apply[K: TypeTag: SpatialComponent](args: Seq[String]): Etl[K] =
-    apply(args, defaultModules)
-
-  def apply[K: TypeTag: SpatialComponent](args: Seq[String], modules: Seq[TypedModule]): Etl[K] =
-    new Etl[K](args, modules)
-
 }
 
-class Etl[K: TypeTag: SpatialComponent](args: Seq[String], modules: Seq[TypedModule]) extends LazyLogging {
+case class Etl[
+  I: TypeTag: IngestKey,
+  K: TypeTag: SpatialComponent,
+  V <: CellGrid : TypeTag: ReprojectView: MergeView: CellGridPrototypeView
+](args: Seq[String], modules: Seq[TypedModule] = Etl.defaultModules)  extends LazyLogging {
+  type M = RasterMetaData
+
   implicit def classTagK = ClassTag(typeTag[K].mirror.runtimeClass( typeTag[K].tpe )).asInstanceOf[ClassTag[K]]
 
   val conf = new EtlConf(args)
@@ -44,34 +58,58 @@ class Etl[K: TypeTag: SpatialComponent](args: Seq[String], modules: Seq[TypedMod
   }
 
   val combinedModule = modules reduce (_ union _)
-  
-  lazy val inputPlugin =
-    combinedModule
-      .findSubclassOf[InputPlugin[K]]
-      .find( _.suitableFor(conf.input(), conf.format()) )
-      .getOrElse(sys.error(s"Unable to find input module of type '${conf.input()}' for format `${conf.format()}"))
-    
+
+  def load()(implicit sc: SparkContext): RDD[(I, V)] = {
+    val plugin =
+      combinedModule
+        .findSubclassOf[InputPlugin[I, V]]
+        .find( _.suitableFor(conf.input(), conf.format()) )
+        .getOrElse(sys.error(s"Unable to find input module of type '${conf.input()}' for format `${conf.format()}"))
+
+    plugin(conf.inputProps)
+  }
+
+  def reproject(rdd: RDD[(I, V)]): RDD[(I, V)] = {
+    rdd.reproject(conf.crs()).persist(conf.cache())
+  }
+
+  def tile(rdd: RDD[(I, V)])(implicit tiler: Tiler[I, K, V]): (Int, RDD[(K, V)] with Metadata[M]) = {
+    val crs = conf.crs()
+    val targetCellType = conf.cellType.get
+
+    val (zoom, rasterMetaData) = scheme match {
+      case Left(layoutScheme) =>
+        val (zoom, rmd) = RasterMetaData.fromRdd(rdd, crs, layoutScheme) { key => key.projectedExtent.extent }
+        targetCellType match {
+          case None => zoom -> rmd
+          case Some(ct) => zoom -> rmd.copy(cellType = ct)
+        }
+
+      case Right(layoutDefinition) =>
+        0 -> RasterMetaData(
+          crs = crs,
+          cellType = targetCellType.get,
+          extent = layoutDefinition.extent,
+          layout = layoutDefinition
+        )
+    }
+    val tiles = rdd.tile[K](rasterMetaData, NearestNeighbor)
+    zoom -> ContextRDD(tiles, rasterMetaData)
+  }
+
   lazy val outputPlugin =
     combinedModule
-      .findSubclassOf[OutputPlugin[K]]
+      .findSubclassOf[OutputPlugin[K, V, M]]
       .find { _.suitableFor(conf.output()) }
       .getOrElse(sys.error(s"Unable to find output module of type '${conf.output()}'"))
 
-  def load()(implicit sc: SparkContext): (LayerId, RasterRDD[K]) = {
-    val (zoom, rdd) = inputPlugin(conf.cache(), conf.crs(), scheme, conf.cellType.get, conf.inputProps)
-    LayerId(conf.layerName(), zoom) -> rdd
-  }
+  def attributes: AttributeStore[JsonFormat] =
+    outputPlugin.attributes(conf.outputProps)
 
-  def save(id: LayerId, rdd: RasterRDD[K], method: KeyIndexMethod[K]): Unit = {
-    val attributes = outputPlugin.attributes(conf.outputProps)
-    def savePyramid(zoom: Int, rdd: RasterRDD[K]): Unit = {
+  def save(id: LayerId, rdd: RDD[(K, V)] with Metadata[M], method: KeyIndexMethod[K]): Unit = {
+    def savePyramid(zoom: Int, rdd: RDD[(K, V)] with Metadata[M]): Unit = {
       val currentId = id.copy( zoom = zoom)
       outputPlugin(currentId, rdd, method, conf.outputProps)
-      if (conf.histogram()) {
-        val histogram = rdd.histogram
-        logger.info(s"Histogram for $currentId: ${histogram.toJson.compactPrint}")
-        attributes.write(currentId, "histogram", histogram)
-      }
 
       scheme match {
         case Left(s) =>

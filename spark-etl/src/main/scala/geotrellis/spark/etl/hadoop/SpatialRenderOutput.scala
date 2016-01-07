@@ -2,16 +2,17 @@ package geotrellis.spark.etl.hadoop
 
 import java.math.BigInteger
 
+import geotrellis.raster.Tile
 import geotrellis.raster.render.ColorBreaks
 import geotrellis.spark.etl.OutputPlugin
 import geotrellis.spark.io.index.KeyIndexMethod
-import geotrellis.spark.{SpatialKey, RasterRDD, LayerId}
+import geotrellis.spark.{RasterMetaData, SpatialKey, RasterRDD, LayerId}
 import geotrellis.spark.render._
 import org.apache.hadoop.conf.ConfServlet.BadFormatException
 import scala.reflect._
 
 
-class SpatialRenderOutput extends OutputPlugin[SpatialKey] {
+class SpatialRenderOutput extends OutputPlugin[SpatialKey, Tile, RasterMetaData] {
   def name = "render"
   def key = classTag[SpatialKey]
   def requiredKeys = Array("path", "format")

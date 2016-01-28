@@ -12,13 +12,11 @@ trait Implicits {
     extends CombineMethods[K, V]
 
   implicit class withCombineTraversableMethods[K: ClassTag, V: ClassTag](rs: Traversable[RDD[(K, V)]]) {
-    def combineValues[R: ClassTag](f: Traversable[V] => R): RDD[(K, R)] = combineValues(f, None)
-    def combineValues[R: ClassTag](f: Traversable[V] => R, partitioner: Option[Partitioner]): RDD[(K, R)] =
+    def combineValues[R: ClassTag](f: Traversable[V] => R, partitioner: Option[Partitioner] = None): RDD[(K, R)] =
       rs.head.combineValues(rs.tail, partitioner)(f)
   }
 
   implicit class withMapValuesTupleMethods[K: ClassTag, V: ClassTag](val self: RDD[(K, (V, V))]) extends MethodExtensions[RDD[(K, (V, V))]] {
-    // TODO these needs names
     def combineValues[R: ClassTag](f: (V, V) => R): RDD[(K, R)] =
       self.mapValues { case (v1, v2) => f(v1, v2) }
   }
@@ -30,7 +28,6 @@ trait Implicits {
           case Some(v2) => f(v1, v2)
           case None => v1
         }
-      //ov2.fold(v1)(f(v1, _)) }
     }
   }
 }

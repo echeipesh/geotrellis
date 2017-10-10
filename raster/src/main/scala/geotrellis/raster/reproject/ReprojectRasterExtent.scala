@@ -38,6 +38,10 @@ object ReprojectRasterExtent {
    * edge) transforming into output coordinates in order to get an extents box.
    */
   def reprojectExtent(ge: GridExtent, transform: Transform): Extent = {
+    densifyGridExtent(ge).envelope.reproject(transform)
+  }
+
+  def densifyGridExtent(ge: GridExtent): Polygon = {
     val extent = ge.extent
     val (cols, rows) = (extent.width / ge.cellwidth, extent.height / ge.cellheight)
     val PIXEL_STEP = math.min(50.0, math.min(cols, rows)).toInt
@@ -48,10 +52,12 @@ object ReprojectRasterExtent {
     val threshold = math.min(xThreshold, yThreshold)
 
     // Densify the extent to get a more accurate reprojection
-    val denseGeom = Polygon(Densifier.densify(extent.toPolygon.jtsGeom, threshold).asInstanceOf[com.vividsolutions.jts.geom.Polygon])
-    denseGeom.reproject(transform).envelope
+    Polygon(Densifier.densify(extent.toPolygon.jtsGeom, threshold).asInstanceOf[com.vividsolutions.jts.geom.Polygon])
   }
 
+  /** Reproject [[GridExtent]], accounting for possible distortion at locations other than the corners.
+    * '''Note''': Ignores 'options.targetRasterExtent'
+    */
   def apply(ge: GridExtent, transform: Transform, options: Options): GridExtent = {
     val extent = ge.extent
     val newExtent = reprojectExtent(ge, transform)

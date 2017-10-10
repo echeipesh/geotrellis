@@ -74,13 +74,20 @@ class TileRDDReprojectSpec extends FunSpec with TestEnvironment {
           )
         }
 
+
+
+
       val actual =
         actualRdd.stitch
+      info(s"Actual RDD TL CS: ${actualRdd.metadata.layout.cellSize}")
+      info(s"Actual RDD TL TL CS: ${actualRdd.metadata.layout.cellSize}")
+      info(s"Actual Raster CS: ${actual.rasterExtent.cellSize}")
 
       // Account for tiles being a bit bigger then the actual result
       actual.extent.covers(expected.extent) should be (true)
       actual.rasterExtent.extent.xmin should be (expected.rasterExtent.extent.xmin +- 0.00001)
       actual.rasterExtent.extent.ymax should be (expected.rasterExtent.extent.ymax +- 0.00001)
+      // actual.tile.dimensions should be (expected.tile.dimensions)
       actual.rasterExtent.cellwidth should be (expected.rasterExtent.cellwidth +- 0.00001)
       actual.rasterExtent.cellheight should be (expected.rasterExtent.cellheight +- 0.00001)
 

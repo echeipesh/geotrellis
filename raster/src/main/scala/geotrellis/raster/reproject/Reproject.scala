@@ -22,15 +22,26 @@ import geotrellis.raster.resample._
 object Reproject {
   /** Reprojection options.
     *
+    * This object parameterizes and switches the reprojection process.
+    * Before reprojection can start target [[RasterExtent]] in target projection must be established.
+    * If `targetRasterExtent` option is given it is used and no other option is consulted.
+    *
+    * Otherwise if `parentGridExtent` is given the source extent will be reproejcted and the target
+    * [[RasterExtent]] will be aligned to the grid of `parentGridExtent`. This implies both cell size and offset.
+    *
+    * Otherwise if `targetCellSize` is given the reprojected extent will be divided by it to derive target [[RasterExtent]].
+    *
+    * Finally as a fallback the target [[CellSize]] and by implication [[RasterExtent]] will be derived based on
+    * source raster dimensions and the diagonal distance of reprojected extent.
+    *
+    * @see [[ReprojectRasterExtent]]
+    *
     * @param      method               The resampling method that will be used in this reprojection.
     * @param      errorThreshold       Error threshold when using approximate row transformations in reprojection.
     *                                  This default comes from GDAL 1.11 code.
-    * @param      parentGridExtent     An optional GridExtent that if set represents the target grid extent for some
-    *                                  parent window, which reprojected extents will snap to. Use with caution.
-    * @param      targetRasterExtent   The target raster extent to reproject to.
-    * @param      targetCellSize       An optional cell size that if set will be used for for the projected raster.
-    *                                  Use with caution.
-    *
+    * @param      parentGridExtent     Align reprojected RasterExtent to this GridExtent. Overrides `targetCellSize` option.
+    * @param      targetRasterExtent   The target raster extent for reproject. Overrides `parentGridExtent` and `targetCellSize` options.
+    * @param      targetCellSize       Cell size that if set will be used for for the projected raster.
     */
   case class Options(
     method: ResampleMethod = NearestNeighbor,

@@ -329,6 +329,7 @@ object Settings {
       spire,
       monocleCore,
       monocleMacro,
+      "org.scala-lang.modules" %% "scala-xml" % "1.0.2",
       scalatest % Test,
       scalacheck % Test
     ),

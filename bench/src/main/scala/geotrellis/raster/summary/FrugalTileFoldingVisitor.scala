@@ -13,28 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package geotrellis.raster.summary.polygonal.visitors
 
 import geotrellis.raster._
 import geotrellis.raster.summary.CellVisitor
 
-object MaxVisitor {
-  implicit def toTileVisitor(t: MaxVisitor.type): TileMaxVisitor =
-    new TileMaxVisitor
-  implicit def toMultibandTileVisitor(
-      t: MaxVisitor.type): MultibandTileMaxVisitor = new MultibandTileMaxVisitor
+abstract class FrugalTileFoldingVisitor
+    extends CellVisitor[Raster[Tile], Option[Double]] {
 
-  // implicit def fold(max: Double, newValue: Double): Double =
-    // if (isData(newValue) && newValue > max) newValue else max
+  private var acc: Double = Double.NaN
+  private var cnt: Int = 0
+  def result: Option[Double] = if (cnt > 0) Some(acc) else None
 
-  class TileMaxVisitor extends TileFoldingVisitor {
-    def fold(max: Double, newValue: Double): Double =
-      if (isData(newValue) && newValue > max) newValue else max
+  def visit(raster: Raster[Tile], col: Int, row: Int): Unit = {
+    val newValue = raster.tile.getDouble(col, row)
+    if (isData(newValue)) {
+      if (cnt == 0) {
+        acc = newValue
+        cnt = 1
+      } else if (cnt > 0) {
+        acc = fold(acc, newValue)
+      }
+    }
   }
 
-  class MultibandTileMaxVisitor extends MultibandTileFoldingVisitor {
-    def fold(max: Double, newValue: Double): Double =
-      if (isData(newValue) && newValue > max) newValue else max
-  }
+  def fold(accum: Double, newValue: Double): Double
 }
